@@ -1,3 +1,7 @@
+CREATE DATABASE withyou;
+
+use withyou;
+
 CREATE TABLE users (
    id BIGINT AUTO_INCREMENT PRIMARY KEY COMMENT '고유 아이디',
    name VARCHAR(50) NOT NULL COMMENT '이름',
