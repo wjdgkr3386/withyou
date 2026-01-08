@@ -1,9 +1,11 @@
+
+import 'bootstrap/dist/css/bootstrap.min.css';
+
 function LoginPage() {
-  return (
-    <div>
-      <h1>로그인</h1>
-    </div>
-  );
+    return (
+        <>
+        </>
+    );
 }
 
 export default LoginPage;
