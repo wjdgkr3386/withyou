@@ -179,9 +179,21 @@ function SignupPage() {
                 />
             </div>
 
-            <button className="btn btn-primary btn-lg w-100" type="submit">
+            <button className="btn btn-primary btn-lg w-100 mb-3" type="submit">
                 회원가입
             </button>
+
+            {/* 로그인 페이지 이동 링크 */}
+            <div className="text-center">
+                <span className="text-muted small">이미 계정이 있으신가요? </span>
+                <button 
+                    type="button" 
+                    className="btn btn-link p-0 small fw-bold text-decoration-none"
+                    onClick={() => navigate('/login')}
+                >
+                    로그인하기
+                </button>
+            </div>
         </form>
     );
 }
