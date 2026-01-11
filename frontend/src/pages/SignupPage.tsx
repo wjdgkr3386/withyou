@@ -1,5 +1,6 @@
 import 'bootstrap/dist/css/bootstrap.min.css';
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function SignupPage() {
     const [name, setName] = useState('');
@@ -12,6 +13,7 @@ function SignupPage() {
     const [email, setEmail] = useState('');
 
     const BASE_URL = import.meta.env.VITE_API_URL;
+    const navigate = useNavigate();
 
     // 전화번호 입력 및 자동 포커스 이동 핸들러
     const handlePhoneChange = (
@@ -51,17 +53,18 @@ function SignupPage() {
                 body: JSON.stringify(user),
             });
 
+            const result = await response.json();
+
             if (!response.ok) {
-                const errorData = await response.json();
-                alert('회원가입 실패: ' + (errorData.message || '오류 발생'));
+                alert('회원가입 실패: ' + result.message);
                 return;
             }
 
-            const data = await response.json();
-            alert('회원가입 성공! 아이디: ' + data.username);
+            alert(result.message); 
+            navigate('/login');
         } catch (error) {
             console.error(error);
-            alert('서버 오류가 발생했습니다.');
+            alert(error);
         }
     };
 
