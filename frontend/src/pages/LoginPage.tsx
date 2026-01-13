@@ -1,26 +1,44 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
 
 function LoginPage() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
+    const { setUser } = useAuth();
+    const BASE_URL = import.meta.env.VITE_API_URL;
 
-    const handleLogin = (e: React.FormEvent) => {
+    const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        console.log('Login attempt:', { username, password });
+        
+        try {
+            const response = await axios.post(`${BASE_URL}/api/login`,
+                { username, password },
+                { withCredentials: true }
+            );
+
+            if (response.data.success) {
+                setUser(username);
+                navigate('/');
+            }
+        } catch (error) {
+            console.error("로그인 실패:", error);
+            alert("아이디 또는 비밀번호를 확인하세요.");
+        }
     };
 
     return (
         <div className="container d-flex flex-column justify-content-center align-items-center vh-100 text-center">
 
-            <h1><Link className="nav-link mb-5 text-primary fw-bold" to="/notice">위드유</Link></h1>
+            <h1><Link className="nav-link mb-5 text-primary fw-bold" to="/">위드유</Link></h1>
 
             <div className="card shadow-lg p-4 rounded-4 w-100" style={{ maxWidth: '420px' }}>
                 
                 <h3 className="text-center fw-bold mb-4">로그인</h3>
 
-                <form onSubmit={handleLogin}>
+                <form onSubmit={handleLogin} className="text-start">
                     {/* 아이디 */}
                     <div className="mb-3">
                         <label className="form-label">아이디</label>

@@ -23,12 +23,12 @@ public class AccountService {
     // ===================
     // 로그인 로직
     // ===================
-    public String login(String username, String password) {
+    public String login(LoginDTO loginDTO) {
 
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsername(loginDTO.getUsername())
                 .orElseThrow(() -> new RuntimeException("사용자 없음"));
 
-        if (!passwordEncoder.matches(password, user.getPassword())) {
+        if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
             throw new RuntimeException("비밀번호 불일치");
         }
 

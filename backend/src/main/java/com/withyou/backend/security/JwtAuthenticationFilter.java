@@ -33,11 +33,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        String header = request.getHeader("Authorization");
+        // 쿠키에서 토큰 찾기
+        String token = null;
+        if (request.getCookies() != null) {
+            for (jakarta.servlet.http.Cookie cookie : request.getCookies()) {
+                if ("accessToken".equals(cookie.getName())) {
+                    token = cookie.getValue();
+                    break;
+                }
+            }
+        }
 
-        if (header != null && header.startsWith("Bearer ")) {
-            String token = header.substring(7);
-
+        // 토큰이 존재하고 유효하다면 인증 처리
+        if (token != null && jwtTokenProvider.validateToken(token)) { // validateToken은 Provider에 정의되어 있어야 함
             Claims claims = jwtTokenProvider.parseToken(token);
 
             String userId = claims.getSubject();
