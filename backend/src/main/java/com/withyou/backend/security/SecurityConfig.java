@@ -54,7 +54,10 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/user/**").permitAll()
+                        .requestMatchers(
+                                "/api/user/**",
+                                "/api/main/images/banner"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .addFilterBefore(

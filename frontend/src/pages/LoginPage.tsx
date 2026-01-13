@@ -7,19 +7,22 @@ function LoginPage() {
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
 
-    const handleLogin = async (e: React.FormEvent) => {
+    const handleLogin = (e: React.FormEvent) => {
         e.preventDefault();
-        // 로그인 로직 구현부
         console.log('Login attempt:', { username, password });
     };
 
     return (
-        <div className="container d-flex justify-content-center align-items-center" style={{ minHeight: '100vh' }}>
-            <div className="card shadow-sm p-4" style={{ width: '100%', maxWidth: '400px', borderRadius: '15px' }}>
-                <h2 className="text-center mb-4 fw-bold">로그인</h2>
+        <div className="container d-flex flex-column justify-content-center align-items-center vh-100 text-center">
+
+            <h1><Link className="nav-link mb-5 text-primary fw-bold" to="/notice">위드유</Link></h1>
+
+            <div className="card shadow-lg p-4 rounded-4 w-100" style={{ maxWidth: '420px' }}>
                 
+                <h3 className="text-center fw-bold mb-4">로그인</h3>
+
                 <form onSubmit={handleLogin}>
-                    {/* 아이디 입력 */}
+                    {/* 아이디 */}
                     <div className="mb-3">
                         <label className="form-label">아이디</label>
                         <input
@@ -32,7 +35,7 @@ function LoginPage() {
                         />
                     </div>
 
-                    {/* 비밀번호 입력 */}
+                    {/* 비밀번호 */}
                     <div className="mb-4">
                         <label className="form-label">비밀번호</label>
                         <input
@@ -45,42 +48,51 @@ function LoginPage() {
                         />
                     </div>
 
-                    {/* 로그인 버튼 */}
                     <button type="submit" className="btn btn-primary btn-lg w-100 mb-3">
                         로그인
                     </button>
 
-                    {/* 회원가입 이동 */}
                     <div className="text-center mb-4">
                         <span className="text-muted small">계정이 없으신가요? </span>
-                        <Link to="/signup" className="text-decoration-none small fw-bold">회원가입</Link>
+                        <Link to="/signup" className="fw-semibold text-decoration-none">
+                            회원가입
+                        </Link>
                     </div>
                 </form>
 
-                <div className="hr-sect mb-4" style={{ display: 'flex', alignItems: 'center', color: '#aaa', fontSize: '12px' }}>
-                    <div style={{ flexGrow: 1, height: '1px', backgroundColor: '#eee' }}></div>
-                    <div style={{ padding: '0 10px' }}>간편 로그인</div>
-                    <div style={{ flexGrow: 1, height: '1px', backgroundColor: '#eee' }}></div>
+                {/* 구분선 */}
+                <div className="d-flex align-items-center my-4">
+                    <hr className="flex-grow-1" />
+                    <span className="px-2 text-muted small">간편 로그인</span>
+                    <hr className="flex-grow-1" />
                 </div>
 
-                {/* 소셜 로그인 버튼 그룹 */}
+                {/* 소셜 로그인 */}
                 <div className="d-grid gap-2">
-                    {/* 구글 로그인 */}
-                    <button className="btn btn-outline-dark d-flex align-items-center justify-content-center py-2" style={{ fontSize: '15px' }}>
-                        <img 
-                            src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png" 
-                            alt="Google" 
-                            style={{ width: '18px', marginRight: '10px' }} 
+                    <button className="btn btn-outline-dark d-flex align-items-center justify-content-center py-2">
+                        <img
+                            src="https://www.gstatic.com/images/branding/product/1x/gsa_512dp.png"
+                            alt="Google"
+                            width="18"
+                            className="me-2"
                         />
-                        Google
+                        Google 로그인
                     </button>
 
-                    {/* 카카오 로그인 */}
-                    <button className="btn d-flex align-items-center justify-content-center py-2" style={{ backgroundColor: '#FEE500', color: '#000', border: 'none', fontSize: '15px' }}>
-                        <img src="https://upload.wikimedia.org/wikipedia/commons/e/e3/KakaoTalk_logo.svg" alt="Kakao" style={{ width: '18px', marginRight: '10px' }} />
-                        Kakao
+                    <button
+                        className="btn d-flex align-items-center justify-content-center py-2"
+                        style={{ backgroundColor: '#FEE500' }}
+                    >
+                        <img
+                            src="https://upload.wikimedia.org/wikipedia/commons/e/e3/KakaoTalk_logo.svg"
+                            alt="Kakao"
+                            width="18"
+                            className="me-2"
+                        />
+                        Kakao 로그인
                     </button>
                 </div>
+
             </div>
         </div>
     );

@@ -13,25 +13,6 @@ function Footer() {
                         <p className="small mb-1">대표번호: 010-1234-5678</p>
                         <p className="small">이메일: contact@withyou.com</p>
                     </div>
-
-                    {/* 빠른 링크 (화면정의서 기반) */}
-                    <div className="col-md-4 mb-4">
-                        <h5 className="fw-bold mb-3">바로가기</h5>
-                        <ul className="list-unstyled small">
-                            <li className="mb-2"><Link to="/intro" className="text-light text-decoration-none">학원 소개</Link></li>
-                            <li className="mb-2"><Link to="/class" className="text-light text-decoration-none">수업 안내</Link></li>
-                            <li className="mb-2"><Link to="/notice" className="text-light text-decoration-none">공지사항</Link></li>
-                        </ul>
-                    </div>
-
-                    {/* 이용 약관 */}
-                    <div className="col-md-4 mb-4">
-                        <h5 className="fw-bold mb-3">고객지원</h5>
-                        <ul className="list-unstyled small">
-                            <li className="mb-2"><a href="#!" className="text-light text-decoration-none">개인정보처리방침</a></li>
-                            <li className="mb-2"><a href="#!" className="text-light text-decoration-none">이용약관</a></li>
-                        </ul>
-                    </div>
                 </div>
 
                 <hr className="bg-light" />

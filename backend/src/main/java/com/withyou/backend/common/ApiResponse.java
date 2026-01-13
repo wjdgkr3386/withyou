@@ -15,10 +15,13 @@ public class ApiResponse<T> {
     }
 
     public static <T> ApiResponse<T> success(String message, T data) {
+        System.out.println("message : " + message + " data : " + data);
         return new ApiResponse<>(true, message, data);
     }
 
     public static ApiResponse<?> error(String message) {
+
+        System.out.println("message : " + message);
         return new ApiResponse<>(false, message, null);
     }
 }
