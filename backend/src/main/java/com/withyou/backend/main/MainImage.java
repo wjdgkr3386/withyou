@@ -21,13 +21,10 @@ public class MainImage {
 
     private String imageUrl;
 
-    private String category;
-
     @Builder
-    public MainImage(String imageName, String s3Key, String imageUrl, String category) {
+    public MainImage(String imageName, String s3Key, String imageUrl) {
         this.imageName = imageName;
         this.s3Key = s3Key;
         this.imageUrl = imageUrl;
-        this.category = category;
     }
 }

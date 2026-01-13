@@ -19,7 +19,7 @@ public class MainController {
     }
 
     @GetMapping("/images/banner")
-    public ResponseEntity<ApiResponse<List<MainImageDTO>>> getMainImages() {
+    public ResponseEntity<ApiResponse<MainImageDTO>> getMainImages() {
         System.out.println("MainController - getMainImages");
         return ResponseEntity.ok(ApiResponse.success("조회 성공", mainService.getMainBanner()));
     }

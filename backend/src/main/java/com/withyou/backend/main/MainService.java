@@ -15,21 +15,15 @@ public class MainService {
         this.mainImageRepository = mainImageRepository;
     }
 
-    public List<MainImageDTO> getMainBanner() {
-        List<MainImage> images = mainImageRepository.findByCategory("main");
-        List<MainImageDTO> mainImageDTOList = new ArrayList<MainImageDTO>();
+    // 메인 배너 이미지 조회
+    public MainImageDTO getMainBanner() {
+        MainImage image = mainImageRepository.findByImageName("메인배너");
 
-        for(MainImage image : images){
-            mainImageDTOList.add(
-                new MainImageDTO(
-                    image.getId(),
-                    image.getImageName(),
-                    image.getS3Key(),
-                    image.getImageUrl(),
-                    image.getCategory()
-                )
-            );
-        }
-        return mainImageDTOList;
+        return new MainImageDTO(
+                image.getId(),
+                image.getImageName(),
+                image.getS3Key(),
+                image.getImageUrl()
+        );
     }
 }
