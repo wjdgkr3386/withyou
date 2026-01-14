@@ -1,6 +1,7 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
+import React from 'react';
 
 function Navbar() {
     const { user, setUser } = useAuth();
@@ -17,10 +18,16 @@ function Navbar() {
         }
     };
 
+    const navLinkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties => ({
+        color: isActive ? 'var(--bs-primary)' : 'inherit',
+        borderBottom: isActive ? '2px solid var(--bs-primary)' : 'none',
+        fontWeight: isActive ? 'bold' : 'normal'
+    });
+
     return (
-        <nav className="navbar navbar-expand-lg navbar-light bg-light shadow-sm mb-4">
+        <nav className="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
             <div className="container">
-                <Link className="navbar-brand fw-bold text-primary" to="/">위드유</Link>
+                <NavLink className="navbar-brand fw-bold text-primary" to="/">위드유</NavLink>
 
                 <button
                     className="navbar-toggler"
@@ -33,10 +40,18 @@ function Navbar() {
 
                 <div className="collapse navbar-collapse mt-2" id="navbarNav">
                     <ul className="navbar-nav me-auto text-start gap-5 mx-5">
-                        <li className="nav-item"><Link className="nav-link" to="/about">소개</Link></li>
-                        <li className="nav-item"><Link className="nav-link" to="/class">수업</Link></li>
-                        <li className="nav-item"><Link className="nav-link" to="/exam">시험</Link></li>
-                        <li className="nav-item"><Link className="nav-link" to="/notice">공지사항</Link></li>
+                        <li className="nav-item">
+                            <NavLink className="nav-link" style={navLinkStyle} to="/about">소개</NavLink>
+                        </li>
+                        <li className="nav-item">
+                            <NavLink className="nav-link" style={navLinkStyle} to="/class">수업</NavLink>
+                        </li>
+                        <li className="nav-item">
+                            <NavLink className="nav-link" style={navLinkStyle} to="/exam">시험</NavLink>
+                        </li>
+                        <li className="nav-item">
+                            <NavLink className="nav-link" style={navLinkStyle} to="/notice">공지사항</NavLink>
+                        </li>
                     </ul>
 
                     <div className="d-flex gap-3 align-items-center">
@@ -47,8 +62,8 @@ function Navbar() {
                             </>
                         ) : (
                             <>
-                                <Link to="/login" className="btn btn-outline-primary btn-sm">로그인</Link>
-                                <Link to="/signup" className="btn btn-primary btn-sm">회원가입</Link>
+                                <NavLink to="/login" className="btn btn-outline-primary btn-sm">로그인</NavLink>
+                                <NavLink to="/signup" className="btn btn-primary btn-sm">회원가입</NavLink>
                             </>
                         )}
                     </div>
