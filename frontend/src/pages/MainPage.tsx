@@ -3,11 +3,10 @@ import mainBanner from '../assets/images/mainbanner.png';
 function MainPage() {
     return (
         <>
-            <div className="container">
-                {/* position-relative만 유지하고 높이 고정(height)은 제거합니다. */}
+            <div className="container pt-4">
                 <div className='position-relative mb-5 overflow-hidden'>
                     
-                    {/* 메인 이미지: w-100과 h-auto를 주면 원본 비율대로 너비에 맞춰집니다. */}
+                    {/* 메인 이미지 */}
                     <img 
                         src={mainBanner}
                         alt="학원 메인 배너"
@@ -17,7 +16,7 @@ function MainPage() {
                         }}
                     />
 
-                    {/* 텍스트 컨텐츠: 이미지 비율에 맞춰 함께 위치가 잡힙니다. */}
+                    {/* 텍스트 */}
                     <div 
                         className="position-absolute top-0 start-0 p-4 p-md-5 text-white"
                         style={{ userSelect: 'none', WebkitUserSelect: 'none' }}
@@ -36,6 +35,7 @@ function MainPage() {
                             </div>
                         </div>
                     </div>
+                    
                 </div>
             </div>
         </>

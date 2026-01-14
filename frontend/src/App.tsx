@@ -9,6 +9,7 @@ import AboutPage from './pages/AboutPage';
 import ClassPage from './pages/ClassPage';
 import ExamPage from './pages/ExamPage';
 import NoticePage from './pages/NoticePage';
+import NoticeWritePage from './pages/NoticeWritePage';
 
 // 공통 레이아웃 컴포넌트 (Navbar와 Footer를 포함)
 function Layout({ children }: { children: React.ReactNode }) {
@@ -28,6 +29,7 @@ function App() {
         {/* 네비바/푸터가 없는 페이지 */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/notice/write" element={<NoticeWritePage />} />
 
         {/* 네비바/푸터가 필요한 페이지들 */}
         <Route path="/" element={<Layout><MainPage /></Layout>} />

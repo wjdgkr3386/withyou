@@ -7,6 +7,7 @@ function Navbar() {
     const { user, setUser } = useAuth();
     const navigate = useNavigate();
 
+    // 로그아웃
     const handleLogout = async () => {
         try {
             await axios.post(`${import.meta.env.VITE_API_URL}/api/logout`, {}, { withCredentials: true });
@@ -18,6 +19,7 @@ function Navbar() {
         }
     };
 
+    // 네비바 선택한 요소 표시
     const navLinkStyle = ({ isActive }: { isActive: boolean }): React.CSSProperties => ({
         color: isActive ? 'var(--bs-primary)' : 'inherit',
         borderBottom: isActive ? '2px solid var(--bs-primary)' : 'none',
@@ -25,10 +27,12 @@ function Navbar() {
     });
 
     return (
-        <nav className="navbar navbar-expand-lg navbar-light bg-light shadow-sm">
+        <nav className="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
             <div className="container">
-                <NavLink className="navbar-brand fw-bold text-primary" to="/">위드유</NavLink>
+                {/* 로고 */}
+                <NavLink className="navbar-brand fw-bold text-primary fs-4" to="/">위드유</NavLink>
 
+                {/* 햄버거 버튼 */}
                 <button
                     className="navbar-toggler"
                     type="button"
@@ -38,32 +42,34 @@ function Navbar() {
                     <span className="navbar-toggler-icon"></span>
                 </button>
 
-                <div className="collapse navbar-collapse mt-2" id="navbarNav">
-                    <ul className="navbar-nav me-auto text-start gap-5 mx-5">
+                {/* 네비바 요소 */}
+                <div className="collapse navbar-collapse" id="navbarNav">
+                    <ul className="navbar-nav mx-auto gap-lg-5 text-center">
                         <li className="nav-item">
-                            <NavLink className="nav-link" style={navLinkStyle} to="/about">소개</NavLink>
+                            <NavLink className="nav-link px-3" style={navLinkStyle} to="/about">소개</NavLink>
                         </li>
                         <li className="nav-item">
-                            <NavLink className="nav-link" style={navLinkStyle} to="/class">수업</NavLink>
+                            <NavLink className="nav-link px-3" style={navLinkStyle} to="/class">수업</NavLink>
                         </li>
                         <li className="nav-item">
-                            <NavLink className="nav-link" style={navLinkStyle} to="/exam">시험</NavLink>
+                            <NavLink className="nav-link px-3" style={navLinkStyle} to="/exam">시험</NavLink>
                         </li>
                         <li className="nav-item">
-                            <NavLink className="nav-link" style={navLinkStyle} to="/notice">공지사항</NavLink>
+                            <NavLink className="nav-link px-3" style={navLinkStyle} to="/notice">공지사항</NavLink>
                         </li>
                     </ul>
 
-                    <div className="d-flex gap-3 align-items-center">
+                    {/* 로그인/로그아웃 */}
+                    <div className="d-flex gap-2 align-items-center justify-content-center mt-3 mt-lg-0">
                         {user ? (
                             <>
-                                <span className="text-dark fw-bold">{user}님</span>
-                                <button onClick={handleLogout} className="btn btn-outline-danger btn-sm">로그아웃</button>
+                                <span className="text-dark fw-bold me-2">{user}님</span>
+                                <button onClick={handleLogout} className="btn btn-outline-danger btn-sm rounded-pill px-3">로그아웃</button>
                             </>
                         ) : (
                             <>
-                                <NavLink to="/login" className="btn btn-outline-primary btn-sm">로그인</NavLink>
-                                <NavLink to="/signup" className="btn btn-primary btn-sm">회원가입</NavLink>
+                                <NavLink to="/login" className="btn btn-outline-primary btn-sm rounded-pill px-3">로그인</NavLink>
+                                <NavLink to="/signup" className="btn btn-primary btn-sm rounded-pill px-3 text-white">회원가입</NavLink>
                             </>
                         )}
                     </div>

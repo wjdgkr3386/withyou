@@ -63,7 +63,7 @@ function AboutPage() {
         }
     }, []);
 
-    // 공통 카드 클래스 정의 (일관성 유지)
+    // 공통 카드 클래스 정의
     const cardClass = "card shadow-sm mb-5 border-0 bg-white overflow-hidden";
 
     return (
@@ -75,14 +75,7 @@ function AboutPage() {
                     <p className="lead text-secondary">수학 학습 여정을 함께하는 든든한 동반자</p>
                 </div>
 
-                {/* Banner Section */}
-                <div className="row justify-content-center mb-5">
-                    <div className="col-lg-11">
-                        <img src={mainbanner} alt="Main Banner" className="img-fluid rounded-4 shadow-sm" />
-                    </div>
-                </div>
-
-                {/* 1. Vision & Core Philosophy Section */}
+                {/* 비젼 섹션 */}
                 <div className={cardClass}>
                     <div className="card-body p-4 p-md-5">
                         <div className="text-center mb-5 py-4 border-bottom">
@@ -110,7 +103,7 @@ function AboutPage() {
                     </div>
                 </div>
 
-                {/* 2. Facility Section */}
+                {/* 학원 시설 섹션 */}
                 <div className={cardClass}>
                     <div className="card-body p-4 p-md-5">
                         <h2 className="text-center fw-bold mb-5 mt-2">학원 시설</h2>
@@ -134,7 +127,7 @@ function AboutPage() {
                     </div>
                 </div>
 
-                {/* 3. Faculty Section */}
+                {/* 선생님 소개 섹션 */}
                 <div className={cardClass}>
                     <div className="card-body p-4 p-md-5">
                         <h2 className="card-title text-center fw-bold mb-5 mt-2">선생님</h2>
@@ -158,7 +151,7 @@ function AboutPage() {
                     </div>
                 </div>
 
-                {/* 4. Location Section */}
+                {/* 학원 위치 섹션 */}
                 <div className={cardClass}>
                     <div className="card-body p-4 p-md-5">
                         <h2 className="card-title text-center fw-bold mb-5 mt-2">학원 위치</h2>
@@ -183,6 +176,7 @@ function AboutPage() {
                         </div>
                     </div>
                 </div>
+
             </div>
         </div>
     );
