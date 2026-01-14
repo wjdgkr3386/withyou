@@ -34,7 +34,7 @@ public class AccountService {
 
         // 로그인 성공시 JWT 발급
         return jwtTokenProvider.createToken(
-                user.getId(),
+                user.getUsername(),
                 user.getRole().name()
         );
     }

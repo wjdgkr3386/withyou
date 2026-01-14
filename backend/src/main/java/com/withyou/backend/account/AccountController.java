@@ -36,7 +36,7 @@ public class AccountController {
         
         response.addCookie(cookie);
 
-        return ResponseEntity.ok(ApiResponse.success("로그인 성공(쿠키)", null));
+        return ResponseEntity.ok(ApiResponse.success("로그인 성공", null));
     }
 
     // 로그아웃 로직

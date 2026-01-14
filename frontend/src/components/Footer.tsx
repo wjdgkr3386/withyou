@@ -1,6 +1,3 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
-
 function Footer() {
     return (
         <footer className="bg-dark text-light py-5 mt-auto">

@@ -36,12 +36,12 @@ public class JwtTokenProvider {
     }
 
     // 토큰 발급
-    public String createToken(Long userId, String role) {
+    public String createToken(String username, String role) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + expireTime);
 
         return Jwts.builder()
-                .setSubject(String.valueOf(userId)) // 사용자 식별자
+                .setSubject(String.valueOf(username)) // 사용자 식별자
                 .claim("role", role)                 // 권한
                 .setIssuedAt(now)
                 .setExpiration(expiry)
