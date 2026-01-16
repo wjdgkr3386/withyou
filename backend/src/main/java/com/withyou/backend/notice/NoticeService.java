@@ -1,5 +1,6 @@
 package com.withyou.backend.notice;
 
+import com.withyou.backend.common.Util;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -9,9 +10,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class NoticeService {
 
     private NoticeRepository noticeRepository;
+    private Util util;
 
-    public NoticeService(NoticeRepository noticeRepository) {
+    public NoticeService(NoticeRepository noticeRepository, Util util) {
         this.noticeRepository = noticeRepository;
+        this.util = util;
     }
 
     @PreAuthorize("hasRole('ADMIN')")
@@ -37,9 +40,12 @@ public class NoticeService {
             throw new RuntimeException("내용을 입력해주세요.");
         }
 
+        // baseUrl을 이미지 형태로 치환 후 s3에 저장
+        String newHtmlSource =  util.replaceHtmlContent(noticeWriteDTO.getContent(), "images");
+        
         Notice notice = new Notice(
             noticeWriteDTO.getTitle(),
-            noticeWriteDTO.getContent(),
+            newHtmlSource,
             noticeWriteDTO.isImportant()
         );
 

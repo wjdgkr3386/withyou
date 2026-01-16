@@ -67,14 +67,33 @@ function NoticeWritePage() {
             FontFamily,
             Highlight.configure({ multicolor: true }),
             TextAlign.configure({
-                types: ['heading', 'paragraph'],
+                types: ['heading', 'paragraph', 'image'], 
             }),
-            Image.configure({
-                allowBase64: true,
-                HTMLAttributes: {
-                    class: 'img-fluid rounded shadow-sm',
-                },
-            }),
+            Image.extend({
+            addAttributes() {
+                return {
+                    ...this.parent?.(),
+                    textAlign: {
+                        default: 'left',
+                        parseHTML: element => element.style.textAlign || 'left',
+                        renderHTML: attributes => {
+                            if (attributes.textAlign === 'center') {
+                                return { style: 'margin-left: auto; margin-right: auto; display: block; text-align: center;' };
+                            }
+                            if (attributes.textAlign === 'right') {
+                                return { style: 'margin-left: auto; margin-right: 0; display: block; text-align: right;' };
+                            }
+                            return { style: 'margin-left: 0; margin-right: auto; display: block; text-align: left;' };
+                        },
+                    },
+                };
+            },
+        }).configure({
+            allowBase64: true,
+            HTMLAttributes: {
+                class: 'img-fluid rounded shadow-sm',
+            },
+        }),
             Link.configure({ openOnClick: false }),
         ],
         content: '',
@@ -85,31 +104,34 @@ function NoticeWritePage() {
         },
     });
 
-    /* 이미지 삽입 */
-    const addImage = () => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
+const addImage = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
 
-        input.onchange = (e: Event) => {
+    input.onchange = (e: Event) => {
+        const target = e.target as HTMLInputElement; 
+        if (!target || !target.files?.[0] || !editor) return;
 
-            const target = e.target as HTMLInputElement; 
-            
-            if (!target || !target.files?.[0] || !editor) return;
-
-            const file = target.files[0];
-            const reader = new FileReader();
-            
-            reader.onload = (event) => {
-                const result = event.target?.result;
-                if (typeof result === 'string') {
-                    editor.chain().focus().setImage({ src: result }).run();
-                }
-            };
-            reader.readAsDataURL(file);
+        const file = target.files[0];
+        const reader = new FileReader();
+        
+        reader.onload = (event) => {
+            const result = event.target?.result;
+            if (typeof result === 'string') {
+                // 한 번의 run()으로 묶어서 실행해야 에러가 적습니다.
+                editor.chain()
+                    .focus()
+                    .setImage({ src: result })
+                    .createParagraphNear() // 이미지 근처에 새로운 문단 생성
+                    .insertContent('<p></p>') // 실제 커서가 머물 빈 줄 삽입
+                    .run();
+            }
         };
-        input.click();
+        reader.readAsDataURL(file);
     };
+    input.click();
+};
 
     // 공지사항 등록
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -335,10 +357,27 @@ function NoticeWritePage() {
                     outline: none;
                 }
                 .write-editor-content img {
-                    max-width: 100%;
                     display: block;
-                    margin: 10px 0;
+                    max-width: 100%;
+                    height: auto;
                 }
+
+                /* Tiptap에서 정렬 스타일이 강제로 적용되도록 설정 */
+                .write-editor-content img[style*="margin-left: auto"][style*="margin-right: auto"] {
+                    margin-left: auto !important;
+                    margin-right: auto !important;
+                }
+
+                .write-editor-content img[style*="text-align: right"] {
+                    margin-left: auto !important;
+                    margin-right: 0 !important;
+                }
+
+                .write-editor-content img[style*="text-align: left"] {
+                    margin-left: 0 !important;
+                    margin-right: auto !important;
+                }
+
                 .write-editor-content hr {
                     border: none;
                     border-top: 2px solid #dee2e6;

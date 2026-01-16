@@ -43,6 +43,14 @@ dependencies {
     runtimeOnly   'io.jsonwebtoken:jjwt-jackson:0.11.5' // JSON 직렬화/역직렬화
 
     // ==================================================
+    // S3
+    // ==================================================
+    implementation 'io.awspring.cloud:spring-cloud-starter-aws:2.4.4'
+    implementation 'org.jsoup:jsoup:1.15.3'
+    implementation platform('software.amazon.awssdk:bom:2.20.0')
+    implementation 'software.amazon.awssdk:s3'
+
+    // ==================================================
     // Lombok
     // ==================================================
     compileOnly 'org.projectlombok:lombok'

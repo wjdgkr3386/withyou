@@ -17,6 +17,8 @@ public class S3UploadService {
 
     @Value("${cloud.aws.s3.bucket}")
     private String bucket;
+    @Value("${cloud.aws.region.static}")
+    private String region;
 
     public S3UploadService(S3Client s3Client) {
         this.s3Client = s3Client;
@@ -41,5 +43,17 @@ public class S3UploadService {
         s3Client.deleteObject(builder ->
                 builder.bucket(bucket).key(key)
         );
+    }
+
+    public String uploadBase64(String key, byte[] fileBytes, String contentType) {
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(key)
+                .contentType(contentType)
+                .build();
+
+        s3Client.putObject(request, RequestBody.fromBytes(fileBytes));
+
+        return String.format("https://%s.s3.%s.amazonaws.com/%s", bucket, region, key);
     }
 }
