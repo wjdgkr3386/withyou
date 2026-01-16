@@ -11,7 +11,7 @@ import { TextAlign } from '@tiptap/extension-text-align';
 import { FontFamily } from '@tiptap/extension-font-family';
 import { Highlight } from '@tiptap/extension-highlight';
 import { Extension } from '@tiptap/core';
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 
 // 이미지 에셋 임포트
 import CancleLine from '../assets/images/editor/cancleLine.png';
@@ -23,6 +23,7 @@ function NoticeWritePage() {
     const navigate = useNavigate();
     const [title, setTitle] = useState('');
     const [isImportant, setIsImportant] = useState(false);
+    const BASE_URL = import.meta.env.VITE_API_URL;
 
     const FontSize = Extension.create({
         name: 'fontSize',
@@ -61,7 +62,7 @@ function NoticeWritePage() {
             StarterKit,
             Underline,
             TextStyle,
-            FontSize, // 커스텀 글자 크기 확장 등록
+            FontSize,
             Color,
             FontFamily,
             Highlight.configure({ multicolor: true }),
@@ -91,10 +92,9 @@ function NoticeWritePage() {
         input.accept = 'image/*';
 
         input.onchange = (e: Event) => {
-            // e.target을 HTMLInputElement로 단언합니다.
+
             const target = e.target as HTMLInputElement; 
             
-            // target이 없거나 파일이 없는 경우를 방지합니다.
             if (!target || !target.files?.[0] || !editor) return;
 
             const file = target.files[0];
@@ -114,13 +114,21 @@ function NoticeWritePage() {
     // 공지사항 등록
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (!editor) return;
 
         const content = editor.getHTML();
 
+        const plainText = editor.getText().replace(/\u00A0/g, " ").trim();
+        const hasImage = content.includes('<img');
+
+        if (!plainText && !hasImage) {
+            alert("내용을 입력해주세요.");
+            editor.commands.focus();
+            return;
+        }
+
         try {
             const response = await axios.post(
-                '/api/notice/write',
+                `${BASE_URL}/api/notice/write`,
                 { title, content, isImportant, },
                 { withCredentials: true }
             );
@@ -135,8 +143,10 @@ function NoticeWritePage() {
             }
             
         } catch (error) {
-            console.error(error);
-            alert('공지 등록 중 오류가 발생했습니다.');
+            const err = error as AxiosError<{ message: string }>;
+            const error_message = err.response?.data?.message || "공지 등록 중 오류 발생";
+            console.log(error_message);
+            alert(error_message);
         }
     };
 

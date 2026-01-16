@@ -1,4 +1,4 @@
-package com.withyou.backend.security;
+package com.withyou.backend.common.security;
 
 import java.io.IOException;
 import java.util.List;

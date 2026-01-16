@@ -1,0 +1,45 @@
+package com.withyou.backend.common.s3;
+
+import java.io.IOException;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+
+import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+
+@Service
+public class S3UploadService {
+
+    private final S3Client s3Client;
+
+    @Value("${cloud.aws.s3.bucket}")
+    private String bucket;
+
+    public S3UploadService(S3Client s3Client) {
+        this.s3Client = s3Client;
+    }
+
+    public String upload(String key, MultipartFile file) throws IOException {
+        PutObjectRequest request = PutObjectRequest.builder()
+                .bucket(bucket)
+                .key(key)
+                .contentType(file.getContentType())
+                .build();
+
+        s3Client.putObject(
+                request,
+                RequestBody.fromBytes(file.getBytes())
+        );
+
+        return "https://" + bucket + ".s3.amazonaws.com/" + key;
+    }
+
+    public void delete(String key) {
+        s3Client.deleteObject(builder ->
+                builder.bucket(bucket).key(key)
+        );
+    }
+}

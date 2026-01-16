@@ -1,4 +1,4 @@
-package com.withyou.backend.security;
+package com.withyou.backend.common.security;
 
 import java.util.List;
 
@@ -56,8 +56,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/signup/**",
-                                "/api/login/**",
-                                "/api/main/images/banner"
+                                "/api/login/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -70,4 +69,5 @@ public class SecurityConfig {
 
         return http.build();
     }
+
 }

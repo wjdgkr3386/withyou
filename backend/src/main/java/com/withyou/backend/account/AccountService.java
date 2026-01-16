@@ -1,6 +1,6 @@
 package com.withyou.backend.account;
 
-import com.withyou.backend.security.JwtTokenProvider;
+import com.withyou.backend.common.security.JwtTokenProvider;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;

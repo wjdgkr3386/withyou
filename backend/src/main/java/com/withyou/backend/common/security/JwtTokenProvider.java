@@ -1,4 +1,4 @@
-package com.withyou.backend.security;
+package com.withyou.backend.common.security;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
