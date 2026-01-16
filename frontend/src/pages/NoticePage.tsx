@@ -1,18 +1,42 @@
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+
+// 환경 변수에서 API 기본 URL 가져오기
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 function NoticePage() {
-    const notices = [
-        { id: 101, title: "2026학년도 겨울방학 특강 시간표 및 교재 안내", date: "2026-01-10", important: true },
-        { id: 102, title: "위드유 수학학원 확장 이전 기념 학부모 설명회 개최", date: "2025-12-20", important: true },
-        { id: 103, title: "1월 신정 및 설 연휴 학원 정기 휴무일 안내", date: "2026-01-05", important: false },
-        { id: 104, title: "중등부 기말고사 대비 자체 제작 교재 배부", date: "2025-12-28", important: false },
-        { id: 105, title: "신규 입학 테스트 일정 및 예약 방법", date: "2025-12-15", important: false },
-    ];
+    const [notices, setNotices] = useState<any[]>([]);
+    const [loading, setLoading] = useState(true);
+    const navigate = useNavigate();
 
+    // 서버 데이터 호출
+    useEffect(() => {
+        // BASE_URL을 사용하여 API 호출
+        axios.get(`${BASE_URL}/api/notice/list`)
+            .then(response => {
+                if (response.data.success) {
+                    setNotices(response.data.data);
+                }
+            })
+            .catch(error => {
+                console.error("공지사항 조회 실패:", error);
+                alert("데이터를 불러오는 중 오류가 발생했습니다.");
+            })
+            .finally(() => setLoading(false));
+    }, []);
+
+    // 중요 공지사항 우선 정렬 + 최신순
     const sortedNotices = [...notices].sort((a, b) => {
-        if (a.important === b.important) return 0;
-        return a.important ? -1 : 1;
+        if (a.isImportant !== b.isImportant) {
+            return a.isImportant ? -1 : 1;
+        }
+        if (b.id > a.id) return 1;
+        if (b.id < a.id) return -1;
+        return 0;
     });
+
+    if (loading) return <div className="text-center py-5">로딩 중...</div>;
 
     return (
         <div className="bg-light min-vh-100 py-5">
@@ -31,30 +55,43 @@ function NoticePage() {
                                 <thead className="bg-primary text-white">
                                     <tr>
                                         <th className="py-3 ps-5 text-start">제목</th>
-                                        <th className="py-3 text-center" style={{ width: '150px' }}>날짜</th>
+                                        <th className="py-3 text-center" style={{ width: '150px' }}>첨부파일</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white">
-                                    {sortedNotices.map((notice) => (
-                                        <tr key={notice.id} className="align-middle" style={{ cursor: 'pointer', height: '70px' }}>
-                                            {/* 제목 영역: 왼쪽 여백을 충분히 주어 안정감 부여 */}
-                                            <td className="ps-5">
-                                                <div className="d-flex align-items-center">
-                                                    {notice.important && (
-                                                        <span className="badge bg-danger me-3 px-2 py-1" style={{ fontSize: '0.75rem' }}>필독</span>
+                                    {sortedNotices.length > 0 ? (
+                                        sortedNotices.map((notice) => (
+                                            <tr 
+                                                key={notice.id} 
+                                                className="align-middle" 
+                                                style={{ cursor: 'pointer', height: '70px' }}
+                                                onClick={() => navigate(`/notice/detail/${notice.id}`)}
+                                            >
+                                                <td className="ps-5">
+                                                    <div className="d-flex align-items-center">
+                                                        {notice.isImportant && (
+                                                            <span className="badge bg-danger me-3 px-2 py-1" style={{ fontSize: '0.75rem' }}>필독</span>
+                                                        )}
+                                                        <span className={`${notice.isImportant ? 'fw-bold' : ''} text-dark fs-6`}>
+                                                            {notice.title}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="text-center">
+                                                    {/* 첨부파일 개수 표시 */}
+                                                    {notice.files && notice.files.length > 0 && (
+                                                        <span className="text-muted small">
+                                                            <i className="bi bi-paperclip"></i> {notice.files.length}
+                                                        </span>
                                                     )}
-                                                    <span className={`${notice.important ? 'fw-bold' : ''} text-dark fs-6`}>
-                                                        {notice.title}
-                                                    </span>
-                                                </div>
-                                            </td>
-
-                                            {/* 날짜 영역 */}
-                                            <td className="text-center text-muted small">
-                                                {notice.date}
-                                            </td>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    ) : (
+                                        <tr>
+                                            <td colSpan={2} className="text-center py-5 text-muted">등록된 공지사항이 없습니다.</td>
                                         </tr>
-                                    ))}
+                                    )}
                                 </tbody>
                             </table>
                         </div>
@@ -77,7 +114,6 @@ function NoticePage() {
                             글쓰기
                         </button>
                     </Link>
-                    
                 </div>
             </div>
         </div>

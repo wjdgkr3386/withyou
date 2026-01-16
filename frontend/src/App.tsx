@@ -1,7 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './context/AuthContext'; // Context 추가
+import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
-import Footer from './components/Footer'; // Footer가 있다고 가정
+import Footer from './components/Footer';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
 import MainPage from './pages/MainPage';
@@ -10,6 +10,7 @@ import ClassPage from './pages/ClassPage';
 import ExamPage from './pages/ExamPage';
 import NoticePage from './pages/NoticePage';
 import NoticeWritePage from './pages/NoticeWritePage';
+import NoticeDetailPage from './pages/NoticeDetailPage.tsx';
 
 // 공통 레이아웃 컴포넌트 (Navbar와 Footer를 포함)
 function Layout({ children }: { children: React.ReactNode }) {
@@ -37,6 +38,7 @@ function App() {
         <Route path="/class" element={<Layout><ClassPage /></Layout>} />
         <Route path="/exam" element={<Layout><ExamPage /></Layout>} />
         <Route path="/notice" element={<Layout><NoticePage /></Layout>} />
+        <Route path="/notice/detail/:id" element={<Layout><NoticeDetailPage /></Layout>} />
       </Routes>
     </AuthProvider>
   );

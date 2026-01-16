@@ -1,54 +1,137 @@
 package com.withyou.backend.notice;
 
 import com.withyou.backend.common.Util;
+import com.withyou.backend.common.s3.S3UploadService;
+import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @Transactional
 public class NoticeService {
 
     private NoticeRepository noticeRepository;
+    private S3UploadService s3UploadService;
     private Util util;
 
-    public NoticeService(NoticeRepository noticeRepository, Util util) {
+    public NoticeService(NoticeRepository noticeRepository, S3UploadService s3UploadService, Util util) {
         this.noticeRepository = noticeRepository;
+        this.s3UploadService = s3UploadService;
         this.util = util;
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    public void write(NoticeWriteDTO noticeWriteDTO){
+    public void write(NoticeWriteDTO noticeWriteDTO) {
+        List<String> uploadedKeys = new ArrayList<>();
 
-        // 제목 없을 경우 에러 발생
-        if(noticeWriteDTO.getTitle()==null || noticeWriteDTO.getTitle().isBlank()){
-            throw new RuntimeException("제목을 입력해주세요.");
+        try {
+            // 기본 검증
+            validateNotice(noticeWriteDTO);
+
+            // 본문 이미지 치환 및 S3 저장 (images 폴더)
+            String newHtmlSource = util.replaceHtmlContent(noticeWriteDTO.getContent(), "images", uploadedKeys);
+
+            // Notice 객체 생성
+            Notice notice = new Notice(
+                    noticeWriteDTO.getTitle(),
+                    newHtmlSource,
+                    noticeWriteDTO.isImportant()
+            );
+
+            // 일반 첨부파일 처리 (중복 루프 제거 및 통합)
+            if (noticeWriteDTO.getFiles() != null && !noticeWriteDTO.getFiles().isEmpty()) {
+                for (MultipartFile file : noticeWriteDTO.getFiles()) {
+                    if (file.isEmpty()) continue;
+
+
+                    // S3 저장 경로(Key) 생성
+                    String originalName = file.getOriginalFilename();
+                    String extension = "";
+                    if (originalName != null && originalName.contains(".")) {
+                        extension = originalName.substring(originalName.lastIndexOf("."));
+                    }
+                    String typeFolder = s3UploadService.getFolderByContentType(file.getContentType());
+                    String key = "attachments/" + typeFolder + "/" + UUID.randomUUID() + extension;
+
+                    // S3 업로드 및 키 기록
+                    String url = s3UploadService.upload(key, file);
+                    uploadedKeys.add(key);
+
+                    // DB 저장을 위해 NoticeFile 엔티티 생성 및 연관관계 설정
+                    NoticeFile noticeFile = new NoticeFile(file.getOriginalFilename(), url, notice);
+                    notice.addFile(noticeFile);
+                }
+            }
+
+            // 5. 최종 DB 저장 (Notice와 NoticeFile이 함께 저장됨)
+            noticeRepository.save(notice);
+
+        } catch (Exception e) {
+            rollbackS3Uploads(uploadedKeys);
+            throw new RuntimeException("공지사항 등록 중 오류가 발생했습니다: " + e.getMessage());
         }
+    }
 
-        // HTML 태그 및 공백 엔티티 제거 로직 추가
-        String content = noticeWriteDTO.getContent();
-        String pureText = "";
+    // 검증 로직
+    private void validateNotice(NoticeWriteDTO dto) {
+        if (dto.getFiles() != null && dto.getFiles().size() > 10) throw new RuntimeException("파일은 최대 10개까지입니다.");
+        if (dto.getTitle() == null || dto.getTitle().isBlank()) throw new RuntimeException("제목을 입력해주세요.");
+    }
 
-        if (content != null) {
-            pureText = content.replaceAll("<[^>]*>", "") // 모든 HTML 태그 제거
-                    .replace("&nbsp;", "")     // 공백 엔티티 제거
-                    .trim();                   // 양끝 공백 제거
+    // S3 롤백 로직
+    private void rollbackS3Uploads(List<String> keys) {
+        for (String key : keys) {
+            try {
+                s3UploadService.delete(key);
+            } catch (Exception e) {
+                System.err.println("S3 파일 삭제 실패 (롤백 중): " + key);
+            }
         }
+    }
 
-        // 텍스트도 없고 이미지도 없는 경우 에러 발생
-        if(pureText.isEmpty() && (content == null || !content.contains("<img"))){
-            throw new RuntimeException("내용을 입력해주세요.");
-        }
+    // 공지사항 조회
+    @Transactional(readOnly = true)
+    public List<NoticeResponseDTO> getAllNotices() {
+        // 최신순 정렬 (ID 내림차순)
+        List<Notice> notices = noticeRepository.findAll(Sort.by(Sort.Direction.DESC, "id"));
 
-        // baseUrl을 이미지 형태로 치환 후 s3에 저장
-        String newHtmlSource =  util.replaceHtmlContent(noticeWriteDTO.getContent(), "images");
-        
-        Notice notice = new Notice(
-            noticeWriteDTO.getTitle(),
-            newHtmlSource,
-            noticeWriteDTO.isImportant()
+        return notices.stream().map(notice -> new NoticeResponseDTO(
+                notice.getId(),
+                notice.getTitle(),
+                notice.getContent(),
+                notice.getIsImportant(),
+                notice.getFiles().stream()
+                        .map(file -> new NoticeResponseDTO.FileResponseDTO(
+                                file.getOriginalName(),
+                                file.getFileUrl()))
+                        .toList()
+        )).toList();
+    }
+
+    // 공지사항 상세 조회
+    @Transactional(readOnly = true)
+    public NoticeResponseDTO getNoticeDetail(Long id) {
+        // ID로 공지사항 조회
+        Notice notice = noticeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("해당 공지사항을 찾을 수 없습니다."));
+
+        // DTO로 변환하여 반환
+        return new NoticeResponseDTO(
+                notice.getId(),
+                notice.getTitle(),
+                notice.getContent(),
+                notice.getIsImportant(),
+                notice.getFiles().stream()
+                        .map(file -> new NoticeResponseDTO.FileResponseDTO(
+                                file.getOriginalName(),
+                                file.getFileUrl()))
+                        .toList()
         );
-
-        noticeRepository.save(notice);
     }
 }

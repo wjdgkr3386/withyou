@@ -56,4 +56,30 @@ public class S3UploadService {
 
         return String.format("https://%s.s3.%s.amazonaws.com/%s", bucket, region, key);
     }
+
+
+    public String getFolderByContentType(String contentType) {
+        if (contentType == null) return "others";
+
+        // images: jpg, png, gif, webp, svg 등
+        if (contentType.startsWith("image/")) return "images";
+
+        // videos: mp4, mov, avi, webm 등
+        if (contentType.startsWith("video/")) return "videos";
+
+        // audios: mp3, wav, ogg, aac 등
+        if (contentType.startsWith("audio/")) return "audios";
+
+        // documents: txt, pdf, doc, docx, xls, xlsx, ppt, pptx 등
+        if (contentType.startsWith("text/") || contentType.contains("application/pdf") || contentType.contains("msword") || contentType.contains("officedocument")) {
+            return "documents";
+        }
+
+        // archives: zip, 7z, rar, tar, gz 등
+        if (contentType.contains("zip") || contentType.contains("compressed")) {
+            return "archives";
+        }
+
+        return "others";
+    }
 }
