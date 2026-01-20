@@ -8,7 +8,6 @@ import com.withyou.backend.account.dto.SignupDTO;
 import com.withyou.backend.account.repository.UserRepository;
 import com.withyou.backend.common.Util;
 import com.withyou.backend.common.security.JwtTokenProvider;
-
 import com.withyou.backend.common.solapi.SolapiService;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,6 +27,11 @@ public class AccountService {
     private final RedisTemplate<String, String> redisTemplate;
     private final Util util;
 
+    // Redis 키 접두사 상수화
+    private static final String SIGNUP_PREFIX = "auth:signup:";
+    private static final String VERIFIED_PREFIX = "verified:signup:";
+    private static final String FIND_PW_PREFIX = "auth:findPw:";
+
     public AccountService(UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
                           JwtTokenProvider jwtTokenProvider,
@@ -43,10 +47,9 @@ public class AccountService {
     }
 
     // ===================
-    // 로그인 로직
+    // 로그인
     // ===================
     public String login(LoginDTO loginDTO) {
-
         User user = userRepository.findByUsername(loginDTO.getUsername())
                 .orElseThrow(() -> new RuntimeException("사용자 없음"));
 
@@ -54,33 +57,27 @@ public class AccountService {
             throw new RuntimeException("비밀번호 불일치");
         }
 
-        // 로그인 성공시 JWT 발급
-        return jwtTokenProvider.createToken(
-                user.getUsername(),
-                user.getRole().name()
-        );
+        return jwtTokenProvider.createToken(user.getUsername(), user.getRole().name());
     }
 
     // ===================
-    // 회원가입 로직
+    // 회원가입
     // ===================
     public void signup(SignupDTO signupDTO) {
+        String verifiedKey = VERIFIED_PREFIX + signupDTO.getPhone();
+        String isVerified = redisTemplate.opsForValue().get(verifiedKey);
 
-        // 중복 체크
+        if (isVerified == null) {
+            throw new RuntimeException("전화번호 인증이 완료되지 않았거나 만료되었습니다.");
+        }
+
         if (userRepository.existsByUsername(signupDTO.getUsername())) {
             throw new RuntimeException("이미 사용 중인 아이디입니다.");
         }
-
         if (userRepository.existsByPhone(signupDTO.getPhone())) {
             throw new RuntimeException("이미 등록된 전화번호입니다.");
         }
 
-        if (signupDTO.getEmail() != null &&
-                userRepository.existsByEmail(signupDTO.getEmail())) {
-            throw new RuntimeException("이미 등록된 이메일입니다.");
-        }
-
-        // User 엔티티 생성
         User user = new User(
                 signupDTO.getName(),
                 signupDTO.getUsername(),
@@ -89,84 +86,79 @@ public class AccountService {
                 signupDTO.getEmail(),
                 Role.USER
         );
-
         userRepository.save(user);
+        redisTemplate.delete(verifiedKey);
     }
 
     // ===================
-    // 이름과 휴대폰 번호로 사용자 조회
+    // 회원가입 시 인증번호 발송
+    // ===================
+    public void sendSignupCode(String phone) {
+        String code = util.randomDigitCode(6);
+        // 회원가입 전용 키 사용
+        redisTemplate.opsForValue().set(SIGNUP_PREFIX + phone, code, 5, TimeUnit.MINUTES);
+
+        boolean result = solapiService.sendVerificationSms(phone, "[위드유] 회원가입 인증번호: [" + code + "]");
+        if (!result) throw new RuntimeException("인증번호 발송 실패");
+    }
+
+    // ===================
+    // 회원가입 시 인증번호 검증
+    // ===================
+    public void verifySignupCode(String phone, String code) {
+        String key = SIGNUP_PREFIX + phone;
+        String savedCode = redisTemplate.opsForValue().get(key);
+
+        if (savedCode == null) throw new RuntimeException("인증 시간이 만료되었습니다.");
+        if (!savedCode.equals(code)) throw new RuntimeException("인증번호가 일치하지 않습니다.");
+
+        redisTemplate.opsForValue().set(VERIFIED_PREFIX + phone, "true", 10, TimeUnit.MINUTES);
+
+        redisTemplate.delete(key); // 검증 성공 시 삭제
+    }
+
+    // ===================
+    // 아이디 찾기 (인증 없이 조회만)
     // ===================
     public String findUsername(FindDTO findDTO) {
         User user = userRepository.findByNameAndPhone(findDTO.getName(), findDTO.getPhone())
                 .orElseThrow(() -> new IllegalArgumentException("일치하는 회원 정보를 찾을 수 없습니다."));
-
         return user.getUsername();
     }
 
     // ===================
-    // 인증번호 발송
+    // 비밀번호 찾기용 인증번호 발송
     // ===================
-    public void sendVerificationCode(String phone) {
-        // 인증번호 생성 (6자리 랜덤 숫자)
+    public void sendFindPwCode(String phone) {
         String code = util.randomDigitCode(6);
+        // 비밀번호 찾기 전용 키 사용
+        redisTemplate.opsForValue().set(FIND_PW_PREFIX + phone, code, 5, TimeUnit.MINUTES);
 
-        // Redis 또는 메모리에 인증번호 저장 (5분 유효)
-        redisTemplate.opsForValue().set(
-                "verification:" + phone,
-                code,
-                5,
-                TimeUnit.MINUTES
-        );
-
-        // 전화번호로 인증메시지 발송
-        boolean result = solapiService.sendVerificationSms(phone,
-                "[위드유 수학학원] 인증번호는 ["+code+"]입니다.");
-
-        if(!result){
-            throw new RuntimeException("인증번호 발송 실패");
-        }
+        boolean result = solapiService.sendVerificationSms(phone, "[위드유] 비밀번호 찾기 인증번호: [" + code + "]");
+        if (!result) throw new RuntimeException("인증번호 발송 실패");
     }
 
     // ===================
-    // 비밀번호 조회 및 재설정
+    // 비밀번호 재설정 (검증 포함)
     // ===================
     public void findPassword(FindDTO request) {
         User user = userRepository.findByNameAndUsernameAndPhone(
-                        request.getName(),
-                        request.getUsername(),
-                        request.getPhone()
-                ).orElseThrow(() ->
-                        new IllegalArgumentException("일치하는 회원 정보를 찾을 수 없습니다.")
-                );
+                request.getName(), request.getUsername(), request.getPhone()
+        ).orElseThrow(() -> new IllegalArgumentException("일치하는 회원 정보를 찾을 수 없습니다."));
 
-        // Redis에서 인증번호 조회
-        String key = "verification:" + request.getPhone();
+        String key = FIND_PW_PREFIX + request.getPhone();
         String savedCode = redisTemplate.opsForValue().get(key);
 
-        if (savedCode == null) {
-            throw new IllegalArgumentException("인증번호가 만료되었습니다.");
-        }
+        if (savedCode == null) throw new IllegalArgumentException("인증번호가 만료되었습니다.");
+        if (!savedCode.equals(request.getVerificationCode())) throw new IllegalArgumentException("인증번호가 일치하지 않습니다.");
 
-        // 인증번호 비교
-        if (!savedCode.equals(request.getVerificationCode())) {
-            throw new IllegalArgumentException("인증번호가 일치하지 않습니다.");
-        }
-
-        // 인증 성공 → Redis 삭제
         redisTemplate.delete(key);
 
-        // 임시 비밀번호 전송
-        boolean result = solapiService.sendVerificationSms(request.getPhone(),
-                "임시 비밀번호\n" +
-                        "abc1234567890");
-        if(!result){
-            throw new RuntimeException("비밀번호 재설정 실패했습니다. 관리자에게 연락해주세요.");
-        }
+        String tempPassword = util.randomDigitCode(10); // 임시 비밀번호 무작위 생성 추천
+        boolean result = solapiService.sendVerificationSms(request.getPhone(), "[위드유] 임시 비밀번호: " + tempPassword);
 
-        // 임시 비밀번호로 재설정
-        String newPassword = passwordEncoder.encode("abc1234567890");
-        user.setPassword(newPassword);
+        if (!result) throw new RuntimeException("메시지 발송 실패");
+
+        user.setPassword(passwordEncoder.encode(tempPassword));
     }
-
-
 }

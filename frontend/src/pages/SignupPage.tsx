@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+
 
 const AUTH_TIME = 180;
 const MAX_FAIL = 5;
@@ -94,19 +95,35 @@ function SignupPage() {
     };
 
 
-    const verifyAuthCode = () => {
+    // 전화번호 인증
+    const verifyAuthCode = async () => {
         if (failCount >= MAX_FAIL) {
             alert('인증 시도 횟수를 초과했습니다.');
             resetAuth();
             return;
         }
 
-        if (authCode === '1234') {
-            setIsVerified(true);
-            alert('전화번호 인증 완료');
-        } else {
-            setFailCount(prev => prev + 1);
-            alert(`인증 실패 (${failCount + 1}/${MAX_FAIL})`);
+        try {
+            const res = await fetch(`${BASE_URL}/api/sms/verify`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    phone: phone, 
+                    verificationCode: authCode
+                }),
+            });
+
+            const result = await res.json();
+
+            if (res.ok) {
+                setIsVerified(true);
+                alert('전화번호 인증 완료');
+            } else {
+                setFailCount(prev => prev + 1);
+                alert(result.message || `인증 실패 (${failCount + 1}/${MAX_FAIL})`);
+            }
+        } catch {
+            alert('인증 확인 중 오류 발생');
         }
     };
 
@@ -160,137 +177,110 @@ function SignupPage() {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="container mt-5" style={{ maxWidth: '500px' }}>
-            <h1 className="text-center mb-4">회원가입</h1>
+        <div className="container d-flex flex-column justify-content-center align-items-center min-vh-100 text-center py-5">
+            
+            {/* 상단 위드유 링크 */}
+            <h1>
+                <Link className="nav-link mb-4 text-primary fw-bold" to="/">위드유</Link>
+            </h1>
 
-            {/* 이름 */}
-            <div className="mb-3">
-                <label className="form-label">이름</label>
-                <input className="form-control form-control-lg" value={name}
-                    onChange={e => setName(e.target.value)} required />
-            </div>
+            {/* 회원가입 카드 박스 */}
+            <div className="card shadow-lg p-4 rounded-4 w-100" style={{ maxWidth: '500px' }}>
+                <h3 className="text-center fw-bold mb-4">회원가입</h3>
 
-            {/* 아이디 */}
-            <div className="mb-3">
-                <label className="form-label">아이디</label>
-                <input className="form-control form-control-lg" value={username}
-                    onChange={e => setUsername(e.target.value)} required />
-            </div>
-
-            {/* 비밀번호 */}
-            <div className="mb-3">
-                <label className="form-label">비밀번호</label>
-                <input type="password" className="form-control form-control-lg"
-                    value={password} onChange={e => setPassword(e.target.value)} required />
-            </div>
-
-            {/* 비밀번호 확인 */}
-            <div className="mb-3">
-                <label className="form-label">비밀번호 확인</label>
-                <input type="password" className="form-control form-control-lg"
-                    value={passwordCheck} onChange={e => setPasswordCheck(e.target.value)} required />
-            </div>
-
-            {/* 전화번호 */}
-            <div className="mb-3">
-                <label className="form-label">전화번호</label>
-                <div className="row g-2 align-items-stretch">
-                    <div className="col-3">
-                        <input
-                            id="phone1"
-                            className="form-control form-control-lg"
-                            maxLength={3}
-                            value={phone1}
-                            onChange={(e) => handlePhoneChange(e, setPhone1, 'phone2', 3)}
-                        />
+                <form onSubmit={handleSubmit} className="text-start">
+                    {/* 이름 */}
+                    <div className="mb-3">
+                        <label className="form-label">이름</label>
+                        <input className="form-control form-control-lg" value={name}
+                            onChange={e => setName(e.target.value)} required />
                     </div>
 
-                    <div className="col-3">
-                        <input
-                            id="phone2"
-                            className="form-control form-control-lg"
-                            maxLength={4}
-                            value={phone2}
-                            onChange={(e) => handlePhoneChange(e, setPhone2, 'phone3', 4)}
-                        />
+                    {/* 아이디 */}
+                    <div className="mb-3">
+                        <label className="form-label">아이디</label>
+                        <input className="form-control form-control-lg" value={username}
+                            onChange={e => setUsername(e.target.value)} required />
                     </div>
 
-                    <div className="col-3">
-                        <input
-                            id="phone3"
-                            className="form-control form-control-lg"
-                            maxLength={4}
-                            value={phone3}
-                            onChange={(e) => handlePhoneChange(e, setPhone3, null, 4)}
-                        />
+                    {/* 비밀번호 */}
+                    <div className="mb-3">
+                        <label className="form-label">비밀번호</label>
+                        <input type="password" className="form-control form-control-lg"
+                            value={password} onChange={e => setPassword(e.target.value)} required />
                     </div>
 
-                    <div className="col-3 d-grid">
-                        <button
-                            type="button"
-                            className="btn btn-outline-primary btn-lg text-nowrap h-100"
-                            onClick={sendAuthCode}
-                            disabled={isVerified}
-                        >
-                            인증
-                        </button>
+                    {/* 비밀번호 확인 */}
+                    <div className="mb-3">
+                        <label className="form-label">비밀번호 확인</label>
+                        <input type="password" className="form-control form-control-lg"
+                            value={passwordCheck} onChange={e => setPasswordCheck(e.target.value)} required />
                     </div>
-                </div>
-            </div>
 
-
-            {isCodeSent && (
-                <div className="mb-3">
-                    <label className="form-label d-flex">
-                        <span>인증번호</span>
-                        {!isVerified && (
-                            <span className="text-danger small ms-2">
-                                남은시간 {formatTime(timeLeft)}
-                            </span>
-                        )}
-                    </label>
-
-                    <div className="row g-2 align-items-stretch">
-                        <div className="col-9">
-                            <input
-                                className="form-control form-control-lg"
-                                maxLength={6}
-                                value={authCode}
-                                onChange={(e) =>
-                                    setAuthCode(e.target.value.replace(/[^0-9]/g, ''))
-                                }
-                                placeholder="6자리 입력"
-                                disabled={isVerified}
-                            />
-                        </div>
-
-                        <div className="col-3 d-grid">
-                            <button
-                                type="button"
-                                className="btn btn-primary btn-lg text-nowrap h-100"
-                                onClick={verifyAuthCode}
-                                disabled={isVerified}
-                            >
-                                확인
-                            </button>
+                    {/* 전화번호 */}
+                    <div className="mb-3">
+                        <label className="form-label">전화번호</label>
+                        <div className="row g-2 align-items-stretch">
+                            <div className="col-3">
+                                <input id="phone1" className="form-control form-control-lg px-2 text-center" maxLength={3} value={phone1}
+                                    onChange={(e) => handlePhoneChange(e, setPhone1, 'phone2', 3)} readOnly={isVerified} />
+                            </div>
+                            <div className="col-3">
+                                <input id="phone2" className="form-control form-control-lg px-2 text-center" maxLength={4} value={phone2}
+                                    onChange={(e) => handlePhoneChange(e, setPhone2, 'phone3', 4)} readOnly={isVerified} />
+                            </div>
+                            <div className="col-3">
+                                <input id="phone3" className="form-control form-control-lg px-2 text-center" maxLength={4} value={phone3}
+                                    onChange={(e) => handlePhoneChange(e, setPhone3, null, 4)} readOnly={isVerified} />
+                            </div>
+                            <div className="col-3 d-grid">
+                                <button type="button" className="btn btn-outline-primary btn-sm text-nowrap"
+                                    onClick={sendAuthCode} disabled={isVerified}>인증</button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
 
+                    {/* 인증번호 입력란 (활성화 시) */}
+                    {isCodeSent && (
+                        <div className="mb-3 p-3 bg-light rounded-3">
+                            <label className="form-label d-flex justify-content-between">
+                                <span>인증번호 입력</span>
+                                {!isVerified && <span className="text-danger">남은시간 {formatTime(timeLeft)}</span>}
+                            </label>
+                            <div className="row g-2">
+                                <div className="col-8">
+                                    <input className="form-control form-control-lg" maxLength={6} value={authCode}
+                                        onChange={(e) => setAuthCode(e.target.value.replace(/[^0-9]/g, ''))}
+                                        disabled={isVerified} />
+                                </div>
+                                <div className="col-4 d-grid">
+                                    <button type="button" className="btn btn-primary"
+                                        onClick={verifyAuthCode} disabled={isVerified}>확인</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
+                    {isVerified && <div className="text-success small mb-3">✔ 전화번호 인증이 완료되었습니다.</div>}
 
-            {isVerified && <div className="text-success mb-3">✔ 전화번호 인증 완료</div>}
+                    {/* 이메일 */}
+                    <div className="mb-4">
+                        <label className="form-label">이메일 (선택)</label>
+                        <input type="email" className="form-control form-control-lg"
+                            value={email} onChange={e => setEmail(e.target.value)} />
+                    </div>
 
-            {/* 이메일 */}
-            <div className="mb-4">
-                <label className="form-label">이메일 (선택)</label>
-                <input type="email" className="form-control form-control-lg"
-                    value={email} onChange={e => setEmail(e.target.value)} />
+                    <button className="btn btn-primary btn-lg w-100 mb-4">가입하기</button>
+
+                    <div className="text-center">
+                        <span className="text-muted small">이미 계정이 있으신가요? </span>
+                        <Link to="/login" className="fw-semibold text-decoration-none">
+                            로그인
+                        </Link>
+                    </div>
+                </form>
             </div>
-
-            <button className="btn btn-primary btn-lg w-100">회원가입</button>
-        </form>
+        </div>
     );
 }
 

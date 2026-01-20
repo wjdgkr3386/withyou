@@ -21,7 +21,8 @@ public class RateLimitFilter implements Filter {
     // API별 개별 제한 설정 (경로 -> {제한시간, 최대횟수})
     private static final Map<String, RateLimitConfig> API_CONFIGS = Map.of(
             "/api/send-verification", new RateLimitConfig(600, 2),
-            "/api/find/password", new RateLimitConfig(600, 2)
+            "/api/find/password", new RateLimitConfig(600, 2),
+            "/api/sms/verify", new RateLimitConfig(600, 2)
     );
 
     // 필터의 핵심 로직: 요청을 가로채서 제한 여부 확인
