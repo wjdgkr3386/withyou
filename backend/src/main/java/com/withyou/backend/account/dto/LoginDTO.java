@@ -1,4 +1,4 @@
-package com.withyou.backend.account;
+package com.withyou.backend.account.dto;
 
 import lombok.Getter;
 import lombok.Setter;

@@ -1,5 +1,9 @@
-package com.withyou.backend.account;
+package com.withyou.backend.account.controller;
 
+import com.withyou.backend.account.dto.FindDTO;
+import com.withyou.backend.account.service.AccountService;
+import com.withyou.backend.account.dto.LoginDTO;
+import com.withyou.backend.account.dto.SignupDTO;
 import com.withyou.backend.common.ApiResponse;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -61,5 +65,29 @@ public class AccountController {
         }
 
         return ResponseEntity.ok(ApiResponse.success("조회 성공", username));
+    }
+
+    // 아이디 찾기
+    @PostMapping("/find/username")
+    public ResponseEntity<ApiResponse<String>> findUsername(@RequestBody FindDTO request) {
+        System.out.println("findUsername 들어옴");
+        String username = accountService.findUsername(request);
+        return ResponseEntity.ok(ApiResponse.success("아이디 찾기 성공", username));
+    }
+
+    // 인증번호 발송
+    @PostMapping("/send-verification")
+    public ResponseEntity<ApiResponse<Void>> sendVerificationCode(@RequestBody FindDTO request) {
+        System.out.println("sendVerification 들어옴");
+        accountService.sendVerificationCode(request.getPhone());
+        return ResponseEntity.ok(ApiResponse.success("인증번호 발송 성공", null));
+    }
+
+    // 비밀번호 찾기 (임시 비밀번호 발급)
+    @PostMapping("/find/password")
+    public ResponseEntity<ApiResponse<Void>> findPassword(@RequestBody FindDTO request) {
+        System.out.println("findPassword 들어옴");
+        accountService.findPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("임시 비밀번호 발송 성공", null));
     }
 }

@@ -1,4 +1,4 @@
-package com.withyou.backend.notice;
+package com.withyou.backend.notice.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

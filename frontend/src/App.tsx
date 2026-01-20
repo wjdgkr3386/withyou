@@ -4,6 +4,7 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
+import AccountFindPage from './pages/AccountFindPage.tsx';
 import MainPage from './pages/MainPage';
 import AboutPage from './pages/AboutPage';
 import ClassPage from './pages/ClassPage';
@@ -30,6 +31,7 @@ function App() {
         {/* 네비바/푸터가 없는 페이지 */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/account/find" element={<AccountFindPage />} />
         <Route path="/notice/write" element={<NoticeWritePage />} />
 
         {/* 네비바/푸터가 필요한 페이지들 */}

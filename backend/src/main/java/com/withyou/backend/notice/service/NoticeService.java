@@ -1,7 +1,12 @@
-package com.withyou.backend.notice;
+package com.withyou.backend.notice.service;
 
 import com.withyou.backend.common.Util;
 import com.withyou.backend.common.s3.S3UploadService;
+import com.withyou.backend.notice.dto.NoticeWriteDTO;
+import com.withyou.backend.notice.dto.NoticeResponseDTO;
+import com.withyou.backend.notice.entity.Notice;
+import com.withyou.backend.notice.entity.NoticeFile;
+import com.withyou.backend.notice.repository.NoticeRepository;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;

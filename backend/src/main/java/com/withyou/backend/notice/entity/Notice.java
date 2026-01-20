@@ -1,4 +1,4 @@
-package com.withyou.backend.notice;
+package com.withyou.backend.notice.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;

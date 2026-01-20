@@ -6,8 +6,8 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.stereotype.Component;
-import org.springframework.web.multipart.MultipartFile;
 
+import java.security.SecureRandom;
 import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
@@ -61,5 +61,11 @@ public class Util {
         };
     }
 
-
+    // 지정된 길이의 랜덤한 숫자코드 생성 메서드
+    public String randomDigitCode(int length){
+        SecureRandom random = new SecureRandom();
+        int max = (int) Math.pow(10, length);
+        int code = random.nextInt(max);
+        return String.format("%0" + length + "d", code);
+    }
 }

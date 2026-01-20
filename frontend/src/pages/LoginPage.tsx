@@ -8,6 +8,7 @@ function LoginPage() {
     const [password, setPassword] = useState('');
     const navigate = useNavigate();
     const { setUser } = useAuth();
+    const [rememberMe, setRememberMe] = useState(false);
     const BASE_URL = import.meta.env.VITE_API_URL;
 
     const handleLogin = async (e: React.FormEvent) => {
@@ -63,6 +64,26 @@ function LoginPage() {
                             onChange={(e) => setPassword(e.target.value)}
                             required
                         />
+                    </div>
+                    
+                    {/* 로그인 유지 + 계정찾기 */}
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                        <div className="form-check">
+                            <input
+                                className="form-check-input"
+                                type="checkbox"
+                                id="rememberMe"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                            />
+                            <label className="form-check-label small" htmlFor="rememberMe">
+                                로그인 유지
+                            </label>
+                        </div>
+
+                        <Link to="/account/find" className="small text-decoration-none">
+                            계정찾기
+                        </Link>
                     </div>
 
                     <button type="submit" className="btn btn-primary btn-lg w-100 mb-3">

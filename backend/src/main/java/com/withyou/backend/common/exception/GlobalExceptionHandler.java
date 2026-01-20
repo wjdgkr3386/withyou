@@ -18,6 +18,14 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("관리자 권한이 필요합니다."));
     }
 
+    // 잘못된 요청 값(유효성 검증 실패, 인증번호 불일치, 존재하지 않는 사용자 등)일 때 발생
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<?> handleIllegalArgumentException(IllegalArgumentException e) {
+        return ResponseEntity
+                .badRequest()
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
     // 기타 런타임 에러 (400 Bad Request)
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<?> handleRuntimeException(RuntimeException e) {

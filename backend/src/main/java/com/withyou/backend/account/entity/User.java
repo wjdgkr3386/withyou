@@ -1,4 +1,4 @@
-package com.withyou.backend.account;
+package com.withyou.backend.account.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -40,5 +40,9 @@ public class User {
         this.phone = phone;
         this.email = email;
         this.role = role;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
     }
 }

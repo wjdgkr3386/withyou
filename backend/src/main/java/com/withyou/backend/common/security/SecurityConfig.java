@@ -57,6 +57,9 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/signup/**",
                                 "/api/login/**",
+                                "/api/find/username",
+                                "/api/find/password",
+                                "/api/send-verification",
                                 "/api/notice/list",
                                 "/api/notice/detail/**"
                         ).permitAll()
