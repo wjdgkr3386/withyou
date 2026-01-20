@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.security.core.AuthenticationException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -15,7 +16,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleAccessDeniedException(AccessDeniedException e) {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("관리자 권한이 필요합니다."));
+                .body(ApiResponse.error("접근 권한이 없습니다. 로그인이 필요하거나 권한을 확인해주세요."));
     }
 
     // 잘못된 요청 값(유효성 검증 실패, 인증번호 불일치, 존재하지 않는 사용자 등)일 때 발생

@@ -4,14 +4,15 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import LoginPage from './pages/LoginPage';
 import SignupPage from './pages/SignupPage';
-import AccountFindPage from './pages/AccountFindPage.tsx';
+import AccountFindPage from './pages/AccountFindPage';
 import MainPage from './pages/MainPage';
 import AboutPage from './pages/AboutPage';
 import ClassPage from './pages/ClassPage';
 import ExamPage from './pages/ExamPage';
 import NoticePage from './pages/NoticePage';
 import NoticeWritePage from './pages/NoticeWritePage';
-import NoticeDetailPage from './pages/NoticeDetailPage.tsx';
+import NoticeDetailPage from './pages/NoticeDetailPage';
+import MyPage from './pages/Mypage';
 
 // 공통 레이아웃 컴포넌트 (Navbar와 Footer를 포함)
 function Layout({ children }: { children: React.ReactNode }) {
@@ -41,6 +42,7 @@ function App() {
         <Route path="/exam" element={<Layout><ExamPage /></Layout>} />
         <Route path="/notice" element={<Layout><NoticePage /></Layout>} />
         <Route path="/notice/detail/:id" element={<Layout><NoticeDetailPage /></Layout>} />
+        <Route path="/mypage" element={<Layout><MyPage /></Layout>} />
       </Routes>
     </AuthProvider>
   );

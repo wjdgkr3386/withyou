@@ -28,17 +28,25 @@ public class User {
     @Column(length = 50, unique = true, comment = "이메일")
     private String email;
 
+    @Column(length = 10, nullable = false, comment = "생년월일")
+    private String birth;
+
+    @Column(length = 10, nullable = false, comment = "성별")
+    private String gender;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, comment = "권한")
     private Role role;
 
     public User(){}
-    public User(String name, String username, String password, String phone, String email, Role role) {
+    public User(String name, String username, String password, String phone, String email, String birth, String gender, Role role) {
         this.name = name;
         this.username = username;
         this.password = password;
         this.phone = phone;
         this.email = email;
+        this.birth = birth;
+        this.gender = gender;
         this.role = role;
     }
 

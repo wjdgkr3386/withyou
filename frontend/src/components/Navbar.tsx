@@ -63,7 +63,13 @@ function Navbar() {
                     <div className="d-flex gap-2 align-items-center justify-content-center mt-3 mt-lg-0">
                         {user ? (
                             <>
-                                <span className="text-dark fw-bold me-2">{user}님</span>
+                                <NavLink 
+                                    to="/mypage" 
+                                    className="text-decoration-none text-dark fw-bold me-2"
+                                    style={({ isActive }) => ({ color: isActive ? 'var(--bs-primary)' : 'inherit' })}
+                                >
+                                    {user}님
+                                </NavLink>
                                 <button onClick={handleLogout} className="btn btn-outline-danger btn-sm rounded-pill px-3">로그아웃</button>
                             </>
                         ) : (

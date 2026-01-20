@@ -20,9 +20,9 @@ public class AccountController {
         this.accountService = accountService;
     }
 
-    // ===================
+    // =========================================================
     // 회원가입 관련
-    // ===================
+    // =========================================================
 
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<Void>> signup(@RequestBody SignupDTO request) {
@@ -44,9 +44,9 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponse.success("인증 성공", null));
     }
 
-    // ===================
+    // =========================================================
     // 계정 찾기 관련
-    // ===================
+    // =========================================================
 
     // 아이디 찾기
     @PostMapping("/find/username")
@@ -69,10 +69,11 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponse.success("임시 비밀번호 발송 성공", null));
     }
 
-    // ===================
+    // =========================================================
     // 인증/로그아웃/기타
-    // ===================
+    // =========================================================
 
+    // 로그인
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<Void>> login(@RequestBody LoginDTO loginRequest, HttpServletResponse response) {
         String token = accountService.login(loginRequest);
@@ -87,6 +88,7 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponse.success("로그인 성공", null));
     }
 
+    // 로그아웃
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletResponse response) {
         Cookie cookie = new Cookie("accessToken", null);
@@ -96,6 +98,7 @@ public class AccountController {
         return ResponseEntity.ok().build();
     }
 
+    // 네비바 로그인 롹인
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<String>> getMyInfo() {
         String username = org.springframework.security.core.context.SecurityContextHolder

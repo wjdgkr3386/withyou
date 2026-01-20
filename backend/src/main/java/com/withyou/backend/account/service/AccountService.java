@@ -84,6 +84,8 @@ public class AccountService {
                 passwordEncoder.encode(signupDTO.getPassword()),
                 signupDTO.getPhone(),
                 signupDTO.getEmail(),
+                signupDTO.getBirth(),
+                signupDTO.getGender(),
                 Role.USER
         );
         userRepository.save(user);
