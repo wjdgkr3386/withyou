@@ -7,11 +7,11 @@ import com.withyou.backend.account.dto.LoginDTO;
 import com.withyou.backend.account.dto.SignupDTO;
 import com.withyou.backend.account.repository.UserRepository;
 import com.withyou.backend.common.Util;
+import com.withyou.backend.common.exception.CustomException;
 import com.withyou.backend.common.security.JwtTokenProvider;
 import com.withyou.backend.common.solapi.SolapiService;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -57,11 +57,11 @@ public class AccountService {
                 .orElseThrow(() -> new BadCredentialsException("아이디 또는 비밀번호가 올바르지 않습니다."));
 
         if (!user.isActive()) {
-            throw new DisabledException("탈퇴한 계정입니다.");
+            throw new CustomException("탈퇴한 계정입니다.");
         }
 
         if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
-            throw new BadCredentialsException("아이디 또는 비밀번호가 올바르지 않습니다.");
+            throw new CustomException("아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
         return jwtTokenProvider.createToken(user.getUsername(), user.getRole().name());
@@ -71,20 +71,25 @@ public class AccountService {
     // 회원가입
     // ===================
     public void signup(SignupDTO signupDTO) {
+        System.out.println(111);
         String verifiedKey = VERIFIED_PREFIX + signupDTO.getPhone();
         String isVerified = redisTemplate.opsForValue().get(verifiedKey);
 
+        System.out.println(222);
         if (isVerified == null) {
-            throw new RuntimeException("전화번호 인증이 완료되지 않았거나 만료되었습니다.");
+            throw new CustomException("전화번호 인증이 완료되지 않았거나 만료되었습니다.");
         }
 
+        System.out.println(333);
         if (userRepository.existsByUsername(signupDTO.getUsername())) {
-            throw new RuntimeException("이미 사용 중인 아이디입니다.");
+            throw new CustomException("이미 사용 중인 아이디입니다.");
         }
+        System.out.println(444);
         if (userRepository.existsByPhone(signupDTO.getPhone())) {
-            throw new RuntimeException("이미 등록된 전화번호입니다.");
+            throw new CustomException("이미 등록된 전화번호입니다.");
         }
 
+        System.out.println(555);
         User user = new User(
                 signupDTO.getName(),
                 signupDTO.getUsername(),
@@ -96,8 +101,15 @@ public class AccountService {
                 signupDTO.getGrade(),
                 Role.USER
         );
-        userRepository.save(user);
+        System.out.println(666);
+        try {
+            userRepository.save(user);
+        }catch(Exception e){
+            System.out.println(e);
+        }
+        System.out.println(777);
         redisTemplate.delete(verifiedKey);
+        System.out.println(888);
     }
 
     // ===================
@@ -109,7 +121,7 @@ public class AccountService {
         redisTemplate.opsForValue().set(SIGNUP_PREFIX + phone, code, 5, TimeUnit.MINUTES);
 
         boolean result = solapiService.sendVerificationSms(phone, "[위드유] 회원가입 인증번호: [" + code + "]");
-        if (!result) throw new RuntimeException("인증번호 발송 실패");
+        if (!result) throw new CustomException("인증번호 발송 실패");
     }
 
     // ===================
@@ -119,8 +131,8 @@ public class AccountService {
         String key = SIGNUP_PREFIX + phone;
         String savedCode = redisTemplate.opsForValue().get(key);
 
-        if (savedCode == null) throw new RuntimeException("인증 시간이 만료되었습니다.");
-        if (!savedCode.equals(code)) throw new RuntimeException("인증번호가 일치하지 않습니다.");
+        if (savedCode == null) throw new CustomException("인증 시간이 만료되었습니다.");
+        if (!savedCode.equals(code)) throw new CustomException("인증번호가 일치하지 않습니다.");
 
         redisTemplate.opsForValue().set(VERIFIED_PREFIX + phone, "true", 10, TimeUnit.MINUTES);
 
@@ -132,7 +144,7 @@ public class AccountService {
     // ===================
     public String findUsername(FindDTO findDTO) {
         User user = userRepository.findByNameAndPhone(findDTO.getName(), findDTO.getPhone())
-                .orElseThrow(() -> new IllegalArgumentException("일치하는 회원 정보를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException("일치하는 회원 정보를 찾을 수 없습니다."));
         return user.getUsername();
     }
 
@@ -145,7 +157,7 @@ public class AccountService {
         redisTemplate.opsForValue().set(FIND_PW_PREFIX + phone, code, 5, TimeUnit.MINUTES);
 
         boolean result = solapiService.sendVerificationSms(phone, "[위드유] 비밀번호 찾기 인증번호: [" + code + "]");
-        if (!result) throw new RuntimeException("인증번호 발송 실패");
+        if (!result) throw new CustomException("인증번호 발송 실패");
     }
 
     // ===================
@@ -154,20 +166,20 @@ public class AccountService {
     public void findPassword(FindDTO request) {
         User user = userRepository.findByNameAndUsernameAndPhone(
                 request.getName(), request.getUsername(), request.getPhone()
-        ).orElseThrow(() -> new IllegalArgumentException("일치하는 회원 정보를 찾을 수 없습니다."));
+        ).orElseThrow(() -> new CustomException("일치하는 회원 정보를 찾을 수 없습니다."));
 
         String key = FIND_PW_PREFIX + request.getPhone();
         String savedCode = redisTemplate.opsForValue().get(key);
 
-        if (savedCode == null) throw new IllegalArgumentException("인증번호가 만료되었습니다.");
-        if (!savedCode.equals(request.getVerificationCode())) throw new IllegalArgumentException("인증번호가 일치하지 않습니다.");
+        if (savedCode == null) throw new CustomException("인증번호가 만료되었습니다.");
+        if (!savedCode.equals(request.getVerificationCode())) throw new CustomException("인증번호가 일치하지 않습니다.");
 
         redisTemplate.delete(key);
 
         String tempPassword = util.randomDigitCode(10); // 임시 비밀번호 무작위 생성 추천
         boolean result = solapiService.sendVerificationSms(request.getPhone(), "[위드유] 임시 비밀번호: " + tempPassword);
 
-        if (!result) throw new RuntimeException("메시지 발송 실패");
+        if (!result) throw new CustomException("메시지 발송 실패");
 
         user.setPassword(passwordEncoder.encode(tempPassword));
     }
@@ -181,11 +193,11 @@ public class AccountService {
                 .getName();
 
         if (username == null || username.equals("anonymousUser")) {
-            throw new IllegalStateException("로그인이 필요합니다.");
+            throw new CustomException("로그인이 필요합니다.");
         }
 
         User user = userRepository.findByUsername(username)
-                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다."));
 
         // 소프트 삭제
         user.withdraw(

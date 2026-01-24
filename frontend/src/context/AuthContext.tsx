@@ -1,20 +1,35 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
+import { useLocation } from 'react-router-dom';
 
-const AuthContext = createContext<any>(null);
+interface AuthContextType {
+    user: string | null;
+    setUser: React.Dispatch<React.SetStateAction<string | null>>;
+    checkLoginStatus: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [user, setUser] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
+    const location = useLocation();
 
+    // 로그인 체크 제외 경로
+    const publicPaths = ['/login', '/signup', '/account/find'];
+
+    // 쿠키 포함해 내 정보 요청
     const checkLoginStatus = async () => {
         try {
-            // 쿠키를 포함해 내 정보 요청
-            const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/me`, { withCredentials: true });
+            const res = await axios.get(
+                `${import.meta.env.VITE_API_URL}/api/me`,
+                { withCredentials: true }
+            );
+
             if (res.data.success) {
-                setUser(res.data.data); // username 저장
+                setUser(res.data.data); // username
             }
-        } catch (err) {
+        } catch {
             setUser(null);
         } finally {
             setLoading(false);
@@ -22,8 +37,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     useEffect(() => {
+        if (publicPaths.includes(location.pathname)) {
+            setLoading(false);
+            return;
+        }
+
         checkLoginStatus();
-    }, []);
+    }, [location.pathname]);
 
     return (
         <AuthContext.Provider value={{ user, setUser, checkLoginStatus }}>
@@ -32,4 +52,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+    const context = useContext(AuthContext);
+    if (!context) {
+        throw new Error('useAuth must be used within AuthProvider');
+    }
+    return context;
+};

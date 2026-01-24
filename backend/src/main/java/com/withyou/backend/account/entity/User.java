@@ -2,9 +2,11 @@ package com.withyou.backend.account.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.Setter;
 
 @Entity
 @Getter
+@Setter
 @Table(name = "users")
 public class User {
 
@@ -56,11 +58,6 @@ public class User {
         this.gender = gender;
         this.grade = grade;
         this.role = role;
-    }
-
-    // 비밀번호 재설정
-    public void setPassword(String password) {
-        this.password = password;
     }
 
     // 회원 탈퇴 (소프트 탈퇴)

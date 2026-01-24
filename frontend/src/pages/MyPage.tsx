@@ -16,6 +16,10 @@ interface MyPageInfo {
 function MyPage() {
   const [user, setUser] = useState<MyPageInfo | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [isEdit, setIsEdit] = useState(false);
+  const [editUser, setEditUser] = useState<MyPageInfo | null>(null);
+
   const BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
@@ -26,7 +30,7 @@ function MyPage() {
       .catch(err => {
         console.error("데이터 로딩 실패:", err);
         if (err.response?.status === 401) {
-            alert("로그인이 필요합니다.");
+          alert("로그인이 필요합니다.");
         }
       })
       .finally(() => {
@@ -53,6 +57,35 @@ function MyPage() {
     ADULT: '성인'
   };
 
+  const handleEdit = () => {
+    setEditUser(user);
+    setIsEdit(true);
+  };
+
+  const handleCancel = () => {
+    setEditUser(null);
+    setIsEdit(false);
+  };
+
+  const handleSave = async () => {
+    if (!editUser) return;
+
+    try {
+      await axios.patch(`${BASE_URL}/api/mypage/profile`, {
+        phone: editUser.phone,
+        email: editUser.email,
+        grade: editUser.grade,
+      });
+
+      setUser(editUser);
+      setIsEdit(false);
+      alert('프로필이 수정되었습니다.');
+    } catch (err) {
+      alert('프로필 수정 실패');
+      console.error(err);
+    }
+  };
+
   // 계정 탈퇴
   const handleWithdraw = async () => {
     const input = window.prompt(
@@ -74,7 +107,6 @@ function MyPage() {
     }
   };
 
-
   return (
     <div className="bg-light min-vh-100 py-5">
       <div className="container" style={{ maxWidth: '800px' }}>
@@ -88,84 +120,106 @@ function MyPage() {
 
           <div className="d-flex flex-column gap-4">
             <div>
-              <label className="form-label d-flex align-items-center gap-2 text-secondary small">
-                <i className="bi bi-person"></i> 이름
-              </label>
-              <input type="text" className="form-control form-control-lg bg-light border-0 fs-6 text-muted" 
-                value={user.name} readOnly />
+              <label className="form-label small">이름</label>
+              <input className="form-control bg-light" value={user.name} readOnly />
             </div>
 
             <div>
-              <label className="form-label d-flex align-items-center gap-2 text-secondary small">
-                <i className="bi bi-person-badge"></i> 아이디
-              </label>
-              <input type="text" className="form-control form-control-lg bg-light border-0 fs-6 text-muted" 
-                value={user.username} readOnly />
+              <label className="form-label small">아이디</label>
+              <input className="form-control bg-light" value={user.username} readOnly />
             </div>
 
             <div>
-              <label className="form-label d-flex align-items-center gap-2 text-secondary small">
-                <i className="bi bi-calendar-event"></i> 생년월일
-              </label>
-              <input type="text" className="form-control form-control-lg bg-light border-0 fs-6 text-muted" 
-                value={user.birth} readOnly />
+              <label className="form-label small">생년월일</label>
+              <input className="form-control bg-light" value={user.birth} readOnly />
             </div>
 
             <div>
-              <label className="form-label d-flex align-items-center gap-2 text-secondary small">
-                <i className="bi bi-gender-ambiguous"></i> 성별
-              </label>
-              <input type="text" className="form-control form-control-lg bg-light border-0 fs-6 text-muted" 
-                value={user.gender === 'MALE' ? '남성' : user.gender === 'FEMALE' ? '여성' : '미선택'} readOnly />
-            </div>
-
-            <div>
-              <label className="form-label d-flex align-items-center gap-2 text-secondary small">
-                <i className="bi bi-telephone"></i> 전화번호
-              </label>
-              <input type="text" className="form-control form-control-lg bg-light border-0 fs-6 text-muted" 
-                value={user.phone} readOnly />
-            </div>
-
-            <div>
-              <label className="form-label d-flex align-items-center gap-2 text-secondary small">
-                <i className="bi bi-envelope"></i> 이메일
-              </label>
-              <input type="email" className="form-control form-control-lg bg-light border-0 fs-6 text-muted" 
-                value={user.email || '미등록'} readOnly />
-            </div>
-
-            <div>
-              <label className="form-label d-flex align-items-center gap-2 text-secondary small">
-                <i className="bi bi-mortarboard"></i> 학년도
-              </label>
+              <label className="form-label small">성별</label>
               <input
-                type="text"
-                className="form-control form-control-lg bg-light border-0 fs-6 text-muted"
-                value={gradeMap[user.grade] || '미등록'}
+                className="form-control bg-light"
+                value={user.gender === 'MALE' ? '남성' : user.gender === 'FEMALE' ? '여성' : '미선택'}
                 readOnly
               />
             </div>
 
             <div>
-              <label className="form-label d-flex align-items-center gap-2 text-secondary small">
-                <i className="bi bi-mortarboard"></i> 회원 구분
-              </label>
-              <input type="text" className="form-control form-control-lg bg-light border-0 fs-6 text-muted" 
-                value={user.role} readOnly />
+              <label className="form-label small">전화번호</label>
+              <input
+                className="form-control"
+                value={isEdit ? editUser?.phone ?? '' : user.phone}
+                readOnly={!isEdit}
+                onChange={(e) =>
+                  setEditUser(prev => prev && { ...prev, phone: e.target.value })
+                }
+              />
+            </div>
+
+            <div>
+              <label className="form-label small">이메일</label>
+              <input
+                className="form-control"
+                value={isEdit ? editUser?.email ?? '' : user.email}
+                readOnly={!isEdit}
+                onChange={(e) =>
+                  setEditUser(prev => prev && { ...prev, email: e.target.value })
+                }
+              />
+            </div>
+
+            <div>
+              <label className="form-label small">학년도</label>
+              {!isEdit ? (
+                <input
+                  className="form-control bg-light"
+                  value={gradeMap[user.grade] || '미등록'}
+                  readOnly
+                />
+              ) : (
+                <select
+                  className="form-select"
+                  value={editUser?.grade ?? ''}
+                  onChange={(e) =>
+                    setEditUser(prev => prev && { ...prev, grade: e.target.value })
+                  }
+                >
+                  {Object.entries(gradeMap).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div>
+              <label className="form-label small">회원 구분</label>
+              <input className="form-control bg-light" value={user.role} readOnly />
             </div>
           </div>
-          
+
           <div className="d-grid gap-2 mt-5">
-            <button className="btn btn-dark btn-lg py-3 fw-bold border-0 shadow-none rounded-3 fs-6">프로필 수정</button>
-            <div className="d-grid gap-2 mt-2">
-              <button
-                className="btn btn-outline-danger btn-lg py-3 fw-bold rounded-3 fs-6"
-                onClick={handleWithdraw}
-              >
-                회원탈퇴
+            {!isEdit ? (
+              <button className="btn btn-dark btn-lg" onClick={handleEdit}>
+                프로필 수정
               </button>
-            </div>
+            ) : (
+              <>
+                <button className="btn btn-primary btn-lg" onClick={handleSave}>
+                  저장
+                </button>
+                <button className="btn btn-outline-secondary btn-lg" onClick={handleCancel}>
+                  취소
+                </button>
+              </>
+            )}
+
+            <button
+              className="btn btn-outline-danger btn-lg mt-2"
+              onClick={handleWithdraw}
+            >
+              회원탈퇴
+            </button>
           </div>
         </div>
       </div>

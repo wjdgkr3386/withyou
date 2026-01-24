@@ -17,7 +17,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleAuthenticationException(AuthenticationException e) {
         return ResponseEntity
                 .status(HttpStatus.UNAUTHORIZED)
-                .body(ApiResponse.error(e.getMessage()));
+                .body(ApiResponse.error("인증에 실패했습니다."));
     }
 
     // 403
@@ -35,7 +35,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleIllegalArgumentException(IllegalArgumentException e) {
         return ResponseEntity
                 .badRequest()
-                .body(ApiResponse.error(e.getMessage()));
+                .body(ApiResponse.error("잘못된 요청입니다."));
     }
 
     // 500
@@ -45,5 +45,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("서버 오류가 발생했습니다."));
+    }
+
+    // 사용자 정의 예외 처리
+    @ExceptionHandler(CustomException.class)
+    public ResponseEntity<?> handleCustomException(CustomException e) {
+        return ResponseEntity
+                .badRequest()
+                .body(ApiResponse.error(e.getMessage()));
     }
 }

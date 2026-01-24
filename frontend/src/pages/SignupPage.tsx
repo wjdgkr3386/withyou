@@ -211,7 +211,8 @@ function SignupPage() {
         if (!username.trim()) return alert('아이디를 입력해주세요.');
         if (!password) return alert('비밀번호를 입력해주세요.');
         if (!birth) return alert('생년월일을 입력해주세요.');
-
+        if (!gender) return alert('성별을 선택해주세요.');
+        
         // 이름 유효성 (힌글/영문 2~10자)
         if (!nameRegex.test(name)) {
             alert('이름 형식이 올바르지 않습니다. (2~10자 한글/영문)');
@@ -267,6 +268,7 @@ function SignupPage() {
             phone,
             email: email || null,
             birth: birth,
+            gender,
             grade,
         };
 

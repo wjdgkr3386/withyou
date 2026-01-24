@@ -46,7 +46,7 @@ public class SecurityConfig {
 
         // 데이터 조회(GET), 등록(POST), 수정(PUT), 삭제(DELETE) 및
         // 사전 검사 요청(OPTIONS)을 모두 허용
-        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
 
         // 클라이언트가 보낼 수 있는 모든 HTTP 헤더(Authorization, Content-Type 등)를 허용
         config.setAllowedHeaders(List.of("*"));
@@ -94,7 +94,8 @@ public class SecurityConfig {
 
                         // 로그인 사용자 전용
                         .requestMatchers(
-                                "/api/users/me"
+                                "/api/users/me",
+                                "/api/mypage/profile"
                         ).authenticated()
 
                         // 관리자 전용
