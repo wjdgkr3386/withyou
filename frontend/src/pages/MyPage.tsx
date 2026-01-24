@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 interface MyPageInfo {
@@ -20,6 +21,7 @@ function MyPage() {
   const [isEdit, setIsEdit] = useState(false);
   const [editUser, setEditUser] = useState<MyPageInfo | null>(null);
 
+  const navigate = useNavigate();
   const BASE_URL = import.meta.env.VITE_API_URL;
 
   useEffect(() => {
@@ -72,7 +74,6 @@ function MyPage() {
 
     try {
       await axios.patch(`${BASE_URL}/api/mypage/profile`, {
-        phone: editUser.phone,
         email: editUser.email,
         grade: editUser.grade,
       });
@@ -146,12 +147,9 @@ function MyPage() {
             <div>
               <label className="form-label small">전화번호</label>
               <input
-                className="form-control"
-                value={isEdit ? editUser?.phone ?? '' : user.phone}
-                readOnly={!isEdit}
-                onChange={(e) =>
-                  setEditUser(prev => prev && { ...prev, phone: e.target.value })
-                }
+                className="form-control bg-light"
+                value={user.phone}
+                readOnly
               />
             </div>
 
@@ -159,7 +157,7 @@ function MyPage() {
               <label className="form-label small">이메일</label>
               <input
                 className="form-control"
-                value={isEdit ? editUser?.email ?? '' : user.email}
+                value={(isEdit ? editUser?.email : user.email) ?? ''}
                 readOnly={!isEdit}
                 onChange={(e) =>
                   setEditUser(prev => prev && { ...prev, email: e.target.value })
@@ -213,6 +211,13 @@ function MyPage() {
                 </button>
               </>
             )}
+
+            <button 
+              className="btn btn-outline-dark btn-lg mt-2" 
+              onClick={() => navigate('/change-password')} // 라우터에 설정한 경로
+            >
+              비밀번호 변경
+            </button>
 
             <button
               className="btn btn-outline-danger btn-lg mt-2"

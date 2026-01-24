@@ -41,10 +41,6 @@ public class MypageService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
 
-        if (updateDTO.getPhone() != null) {
-            user.setPhone(updateDTO.getPhone());
-        }
-
         if (updateDTO.getEmail() != null) {
             user.setEmail(updateDTO.getEmail());
         }

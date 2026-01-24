@@ -10,6 +10,7 @@ import com.withyou.backend.common.Util;
 import com.withyou.backend.common.exception.CustomException;
 import com.withyou.backend.common.security.JwtTokenProvider;
 import com.withyou.backend.common.solapi.SolapiService;
+import com.withyou.backend.mypage.dto.PasswordChangeDTO;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -64,7 +65,16 @@ public class AccountService {
             throw new CustomException("아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
-        return jwtTokenProvider.createToken(user.getUsername(), user.getRole().name());
+        String token = jwtTokenProvider.createToken(user.getUsername(), user.getRole().name());
+
+        // 로그인 유지 체크에 따라 28일 및 1일
+        redisTemplate.opsForValue().set(
+                "RT:" + user.getUsername(),
+                token,
+                loginDTO.isRememberMe()? 28 : 1 , TimeUnit.DAYS
+        );
+
+        return token;
     }
 
     // ===================
@@ -204,5 +214,25 @@ public class AccountService {
             user.getPhone() + "_WITHDRAW_" + user.getId(),
             user.getEmail() + "_WITHDRAW_" + user.getId()
         );
+    }
+
+    // 비밀번호 변경
+    public void updatePassword(String username, PasswordChangeDTO request) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다."));
+
+        // 현재 비밀번호 체크
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new CustomException("현재 비밀번호가 일치하지 않습니다.");
+        }
+
+        // 새 비밀번호 암호화 및 저장
+        String encodedPassword = passwordEncoder.encode(request.getNewPassword());
+        user.setPassword(encodedPassword);
+        userRepository.save(user);
+    }
+
+    public void logout(String username) {
+        redisTemplate.delete("RT:" + username);
     }
 }

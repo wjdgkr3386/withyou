@@ -7,7 +7,6 @@ import lombok.Setter;
 @Getter
 @Setter
 public class UpdateDTO {
-    private String phone;
     private String email;
     private Grade grade;
 }

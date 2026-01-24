@@ -6,8 +6,10 @@ import com.withyou.backend.account.dto.LoginDTO;
 import com.withyou.backend.account.dto.SignupDTO;
 import com.withyou.backend.common.ApiResponse;
 import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -84,7 +86,7 @@ public class AccountController {
         cookie.setHttpOnly(true);
         cookie.setPath("/");
         // 로그인 유지 (체크o : 30일 유지, 체크x : 브라우저 종료까지 유지)
-        cookie.setMaxAge(loginRequest.isRememberMe()?60 * 60 * 24 * 30:-1);
+        cookie.setMaxAge(loginRequest.isRememberMe()?60 * 60 * 24 * 28:-1);
 
         response.addCookie(cookie);
         return ResponseEntity.ok(ApiResponse.success("로그인 성공", null));
@@ -92,11 +94,16 @@ public class AccountController {
 
     // 로그아웃
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletResponse response) {
+    public ResponseEntity<?> logout(HttpServletResponse response, Authentication auth) {
+        if (auth != null) {
+            accountService.logout(auth.getName());
+        }
+
         Cookie cookie = new Cookie("accessToken", null);
         cookie.setMaxAge(0);
         cookie.setPath("/");
         response.addCookie(cookie);
+
         return ResponseEntity.ok().build();
     }
 

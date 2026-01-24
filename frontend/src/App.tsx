@@ -13,6 +13,8 @@ import NoticePage from './pages/NoticePage';
 import NoticeWritePage from './pages/NoticeWritePage';
 import NoticeDetailPage from './pages/NoticeDetailPage';
 import MyPage from './pages/MyPage';
+import PasswordChangePage from './pages/PasswordChangePage';
+
 
 // 공통 레이아웃 컴포넌트 (Navbar와 Footer를 포함)
 function Layout({ children }: { children: React.ReactNode }) {
@@ -34,7 +36,8 @@ function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/account/find" element={<AccountFindPage />} />
         <Route path="/notice/write" element={<NoticeWritePage />} />
-
+        <Route path="/change-password" element={<PasswordChangePage />} />
+        
         {/* 네비바/푸터가 필요한 페이지들 */}
         <Route path="/" element={<Layout><MainPage /></Layout>} />
         <Route path="/about" element={<Layout><AboutPage /></Layout>} />

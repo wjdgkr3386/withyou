@@ -95,7 +95,8 @@ public class SecurityConfig {
                         // 로그인 사용자 전용
                         .requestMatchers(
                                 "/api/users/me",
-                                "/api/mypage/profile"
+                                "/api/mypage/profile",
+                                "/api/mypage/password"
                         ).authenticated()
 
                         // 관리자 전용
