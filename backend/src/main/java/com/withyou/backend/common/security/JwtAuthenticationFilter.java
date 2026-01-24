@@ -3,6 +3,8 @@ package com.withyou.backend.common.security;
 import java.io.IOException;
 import java.util.List;
 
+import com.withyou.backend.account.entity.User;
+import com.withyou.backend.account.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,9 +23,11 @@ import io.jsonwebtoken.Claims;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserRepository userRepository;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, UserRepository userRepository) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -47,13 +51,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         // 토큰이 존재하고 유효하다면 인증 처리
         if (token != null && jwtTokenProvider.validateToken(token)) { // validateToken은 Provider에 정의되어 있어야 함
             Claims claims = jwtTokenProvider.parseToken(token);
+            String username = claims.getSubject();
 
-            String userId = claims.getSubject();
+            User user = userRepository.findByUsername(username).orElse(null);
+
+            // 탈퇴 계정 체크
+            if (user == null || !user.isActive()) {
+                filterChain.doFilter(request, response);
+                return;
+            }
+
             String role = claims.get("role", String.class);
 
             Authentication auth =
                     new UsernamePasswordAuthenticationToken(
-                            userId,
+                            username ,
                             null,
                             List.of(new SimpleGrantedAuthority("ROLE_" + role))
                     );

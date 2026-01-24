@@ -12,7 +12,7 @@ import ExamPage from './pages/ExamPage';
 import NoticePage from './pages/NoticePage';
 import NoticeWritePage from './pages/NoticeWritePage';
 import NoticeDetailPage from './pages/NoticeDetailPage';
-import MyPage from './pages/Mypage';
+import MyPage from './pages/MyPage';
 
 // 공통 레이아웃 컴포넌트 (Navbar와 Footer를 포함)
 function Layout({ children }: { children: React.ReactNode }) {

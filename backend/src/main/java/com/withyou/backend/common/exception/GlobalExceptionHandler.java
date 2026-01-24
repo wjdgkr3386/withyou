@@ -11,15 +11,26 @@ import org.springframework.security.core.AuthenticationException;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    // 권한 부족 시 발생 (403 Forbidden)
+    // 401
+    // 인증 실패 (로그인 실패, 탈퇴 계정 등)
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<?> handleAuthenticationException(AuthenticationException e) {
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.error(e.getMessage()));
+    }
+
+    // 403
+    // 권한 없음
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<?> handleAccessDeniedException(AccessDeniedException e) {
         return ResponseEntity
                 .status(HttpStatus.FORBIDDEN)
-                .body(ApiResponse.error("접근 권한이 없습니다. 로그인이 필요하거나 권한을 확인해주세요."));
+                .body(ApiResponse.error("접근 권한이 없습니다."));
     }
 
-    // 잘못된 요청 값(유효성 검증 실패, 인증번호 불일치, 존재하지 않는 사용자 등)일 때 발생
+    // 400
+    // 잘못된 요청
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<?> handleIllegalArgumentException(IllegalArgumentException e) {
         return ResponseEntity
@@ -27,11 +38,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(e.getMessage()));
     }
 
-    // 기타 런타임 에러 (400 Bad Request)
+    // 500
+    // 서버 오류
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<?> handleRuntimeException(RuntimeException e) {
         return ResponseEntity
-                .badRequest()
-                .body(ApiResponse.error(e.getMessage()));
+                .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("서버 오류가 발생했습니다."));
     }
 }

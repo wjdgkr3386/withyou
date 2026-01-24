@@ -13,9 +13,10 @@ function LoginPage() {
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
-        
+
         try {
-            const response = await axios.post(`${BASE_URL}/api/login`,
+            const response = await axios.post(
+                `${BASE_URL}/api/login`,
                 { username, password, rememberMe },
                 { withCredentials: true }
             );
@@ -24,9 +25,26 @@ function LoginPage() {
                 setUser(username);
                 navigate('/');
             }
-        } catch (error) {
-            console.error("로그인 실패:", error);
-            alert("아이디 또는 비밀번호를 확인하세요.");
+        } catch (error: any) {
+            if (axios.isAxiosError(error) && error.response) {
+                const status = error.response.status;
+                const message = error.response.data?.message;
+
+                // 탈퇴 계정
+                if (status === 401 && message === '탈퇴한 계정입니다.') {
+                    alert('이미 탈퇴한 계정입니다. 재가입이 필요합니다.');
+                    return;
+                }
+
+                // 일반 로그인 실패
+                if (status === 400 || status === 401) {
+                    alert('아이디 또는 비밀번호를 확인하세요.');
+                    return;
+                }
+            }
+
+            alert('로그인 중 오류가 발생했습니다.');
+            console.error(error);
         }
     };
 

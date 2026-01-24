@@ -25,7 +25,6 @@ function MyPage() {
       })
       .catch(err => {
         console.error("데이터 로딩 실패:", err);
-        // 401 에러(Unauthorized)인 경우 로그인 페이지 이동 등의 처리 가능
         if (err.response?.status === 401) {
             alert("로그인이 필요합니다.");
         }
@@ -36,7 +35,7 @@ function MyPage() {
   }, [BASE_URL]);
 
   if (loading) return <div className="text-center py-5">로딩 중...</div>;
-  if (!user) return <div className="text-center py-5">사용자 정보를 불러올 수 없습니다.</div>;
+  if (!user) { window.location.href = '/login'; return null; }
 
   const gradeMap: Record<string, string> = {
     E1: '초등학교 1학년',

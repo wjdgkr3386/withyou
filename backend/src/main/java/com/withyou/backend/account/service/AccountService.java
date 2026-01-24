@@ -10,6 +10,8 @@ import com.withyou.backend.common.Util;
 import com.withyou.backend.common.security.JwtTokenProvider;
 import com.withyou.backend.common.solapi.SolapiService;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -52,10 +54,14 @@ public class AccountService {
     // ===================
     public String login(LoginDTO loginDTO) {
         User user = userRepository.findByUsername(loginDTO.getUsername())
-                .orElseThrow(() -> new RuntimeException("사용자 없음"));
+                .orElseThrow(() -> new BadCredentialsException("아이디 또는 비밀번호가 올바르지 않습니다."));
+
+        if (!user.isActive()) {
+            throw new DisabledException("탈퇴한 계정입니다.");
+        }
 
         if (!passwordEncoder.matches(loginDTO.getPassword(), user.getPassword())) {
-            throw new RuntimeException("비밀번호 불일치");
+            throw new BadCredentialsException("아이디 또는 비밀번호가 올바르지 않습니다.");
         }
 
         return jwtTokenProvider.createToken(user.getUsername(), user.getRole().name());
