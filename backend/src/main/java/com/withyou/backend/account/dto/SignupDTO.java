@@ -1,5 +1,6 @@
 package com.withyou.backend.account.dto;
 
+import com.withyou.backend.account.entity.Grade;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -15,4 +16,5 @@ public class SignupDTO {
     private String verificationCode;
     private String birth;
     private String gender;
+    private Grade grade;
 }

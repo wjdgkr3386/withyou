@@ -10,6 +10,7 @@ import com.withyou.backend.common.Util;
 import com.withyou.backend.common.security.JwtTokenProvider;
 import com.withyou.backend.common.solapi.SolapiService;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -86,6 +87,7 @@ public class AccountService {
                 signupDTO.getEmail(),
                 signupDTO.getBirth(),
                 signupDTO.getGender(),
+                signupDTO.getGrade(),
                 Role.USER
         );
         userRepository.save(user);
@@ -162,5 +164,27 @@ public class AccountService {
         if (!result) throw new RuntimeException("메시지 발송 실패");
 
         user.setPassword(passwordEncoder.encode(tempPassword));
+    }
+
+    // ===================
+    // 회원 탈퇴
+    // ===================
+    public void withdraw() {
+        String username = SecurityContextHolder.getContext()
+                .getAuthentication()
+                .getName();
+
+        if (username == null || username.equals("anonymousUser")) {
+            throw new IllegalStateException("로그인이 필요합니다.");
+        }
+
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        // 소프트 삭제
+        user.withdraw(
+            user.getPhone() + "_WITHDRAW_" + user.getId(),
+            user.getEmail() + "_WITHDRAW_" + user.getId()
+        );
     }
 }

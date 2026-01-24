@@ -108,4 +108,21 @@ public class AccountController {
         }
         return ResponseEntity.ok(ApiResponse.success("조회 성공", username));
     }
+
+    // =========================================================
+    // 회원탈퇴
+    // =========================================================
+    @DeleteMapping("/users/me")
+    public ResponseEntity<ApiResponse<Void>> withdraw(HttpServletResponse response) {
+        accountService.withdraw();
+
+        // 쿠키 삭제 (로그아웃 처리)
+        Cookie cookie = new Cookie("accessToken", null);
+        cookie.setMaxAge(0);
+        cookie.setPath("/");
+        response.addCookie(cookie);
+
+        return ResponseEntity.ok(ApiResponse.success("회원탈퇴 완료", null));
+    }
+
 }

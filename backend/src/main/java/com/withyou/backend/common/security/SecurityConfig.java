@@ -22,9 +22,12 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CustomUserDetailsService customUserDetailsService;
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          CustomUserDetailsService customUserDetailsService) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.customUserDetailsService = customUserDetailsService;
     }
 
     // PasswordEncoder 빈 등록
@@ -80,19 +83,29 @@ public class SecurityConfig {
                         // 비로그인 허용
                         .requestMatchers(
                                 "/api/sms/**",
-                                "/api/signup/**",
-                                "/api/login/**",
+                                "/api/signup",
+                                "/api/login",
                                 "/api/find/username",
                                 "/api/find/password",
                                 "/api/send-verification",
                                 "/api/notice/list",
                                 "/api/notice/detail/**"
                         ).permitAll()
+
+                        // 로그인 사용자 전용
+                        .requestMatchers(
+                                "/api/users/me"
+                        ).authenticated()
+
                         // 관리자 전용
-                        .requestMatchers("/api/notice/write").hasRole("ADMIN")
-                        // 그 외 로그인 필요
+                        .requestMatchers(
+                                "/api/notice/write"
+                        ).hasRole("ADMIN")
+
+                        // 그 외
                         .anyRequest().authenticated()
                 )
+                .userDetailsService(customUserDetailsService)
                 // JWT 토큰으로 사용자 인증
                 .addFilterBefore(
                         jwtAuthenticationFilter,

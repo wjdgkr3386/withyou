@@ -22,6 +22,7 @@ function SignupPage() {
     const [timeLeft, setTimeLeft] = useState(AUTH_TIME);
     const [isVerified, setIsVerified] = useState(false);
     const [failCount, setFailCount] = useState(0);
+    const [grade, setGrade] = useState('');
 
     const today = new Date().toISOString().split('T')[0];
 
@@ -42,7 +43,8 @@ function SignupPage() {
         name: '',
         birth: '',
         email: '',
-        gender: ''
+        gender: '',
+        grade: ''
     });
 
     const navigate = useNavigate();
@@ -76,6 +78,9 @@ function SignupPage() {
                 break;
             case 'gender':
                 if (!value) errorMsg = '성별을 선택해주세요.';
+                break;
+            case 'grade':
+                if (!value) errorMsg = '학년을 선택해주세요.';
                 break;
         }
         setErrors(prev => ({ ...prev, [name]: errorMsg }));
@@ -237,6 +242,12 @@ function SignupPage() {
             return;
         }
 
+        // 학년 체크
+        if (!grade) {
+            alert('학년을 선택해주세요.');
+            return;
+        }
+
         // 전화번호 인증 여부 체크
         if (!isVerified) {
             alert('전화번호 인증을 완료해주세요.');
@@ -256,6 +267,7 @@ function SignupPage() {
             phone,
             email: email || null,
             birth: birth,
+            grade,
         };
 
         try {
@@ -349,6 +361,7 @@ function SignupPage() {
                             value={birth} max={today} onChange={e => { setBirth(e.target.value); validateField('birth', e.target.value); }} required />
                     </div>
 
+                    {/* 성별 */}
                     <div className="mb-3">
                         <div className="d-flex justify-content-between">
                             <label className="form-label">성별</label>
@@ -390,6 +403,44 @@ function SignupPage() {
                                 </label>
                             </div>
                         </div>
+                    </div>
+
+                    {/* 학년 */}
+                    <div className="mb-3">
+                        <div className="d-flex justify-content-between">
+                            <label className="form-label">학년</label>
+                            {errors.grade && <span className="text-danger small fw-bold">{errors.grade}</span>}
+                        </div>
+
+                        <select
+                            className={`form-select ${errors.grade ? 'is-invalid' : ''}`}
+                            value={grade}
+                            onChange={e => {
+                                setGrade(e.target.value);
+                                validateField('grade', e.target.value);
+                            }}
+                            required
+                        >
+                            <option value="">선택</option>
+                            <optgroup label="초등학교">
+                                <option value="E1">초1</option>
+                                <option value="E2">초2</option>
+                                <option value="E3">초3</option>
+                                <option value="E4">초4</option>
+                                <option value="E5">초5</option>
+                                <option value="E6">초6</option>
+                            </optgroup>
+                            <optgroup label="중학교">
+                                <option value="M1">중1</option>
+                                <option value="M2">중2</option>
+                                <option value="M3">중3</option>
+                            </optgroup>
+                            <optgroup label="고등학교">
+                                <option value="H1">고1</option>
+                                <option value="H2">고2</option>
+                                <option value="H3">고3</option>
+                            </optgroup>
+                        </select>
                     </div>
 
                     {/* 전화번호 */}
