@@ -11,7 +11,7 @@ public class NoticeResponseDTO {
     private Long id;
     private String title;
     private String content;
-    private boolean isImportant;
+    private Boolean isImportant;
     private List<FileResponseDTO> files;
 
     @Getter

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
-
-// 환경 변수에서 API 기본 URL 가져오기
-const BASE_URL = import.meta.env.VITE_API_URL;
+import { useAuth } from '../context/AuthContext';
 
 function NoticePage() {
     const [notices, setNotices] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
+    const { user } = useAuth();
+    const BASE_URL = import.meta.env.VITE_API_URL;
 
     // 서버 데이터 호출
     useEffect(() => {
@@ -70,9 +70,12 @@ function NoticePage() {
                                                 <td className="ps-5">
                                                     <div className="d-flex align-items-center">
                                                         {notice.isImportant && (
-                                                            <span className="badge bg-danger me-3 px-2 py-1" style={{ fontSize: '0.75rem' }}>필독</span>
+                                                            <span className="badge bg-danger me-3 px-2 py-1" style={{ fontSize: '0.75rem' }}>
+                                                                필독
+                                                            </span>
                                                         )}
                                                         <span className={`${notice.isImportant ? 'fw-bold' : ''} text-dark fs-6`}>
+                                                            {notice.isImportant && '[필수] '}
                                                             {notice.title}
                                                         </span>
                                                     </div>
@@ -109,11 +112,13 @@ function NoticePage() {
                         <button className="btn btn-primary px-4">검색</button>
                     </div>
 
-                    <Link to="/Notice/write">
-                        <button className="btn btn-primary px-4 py-2 rounded-pill shadow-sm fw-bold">
-                            글쓰기
-                        </button>
-                    </Link>
+                    {user?.role === 'ADMIN' && (
+                        <Link to="/notice/write">
+                            <button className="btn btn-primary px-4 py-2 rounded-pill shadow-sm fw-bold">
+                                글쓰기
+                            </button>
+                        </Link>
+                    )}
                 </div>
             </div>
         </div>

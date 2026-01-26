@@ -1,6 +1,7 @@
 package com.withyou.backend.notice.service;
 
 import com.withyou.backend.common.Util;
+import com.withyou.backend.common.exception.CustomException;
 import com.withyou.backend.common.s3.S3UploadService;
 import com.withyou.backend.notice.dto.NoticeWriteDTO;
 import com.withyou.backend.notice.dto.NoticeResponseDTO;
@@ -46,7 +47,7 @@ public class NoticeService {
             Notice notice = new Notice(
                     noticeWriteDTO.getTitle(),
                     newHtmlSource,
-                    noticeWriteDTO.isImportant()
+                    noticeWriteDTO.getIsImportant()
             );
 
             // 일반 첨부파일 처리 (중복 루프 제거 및 통합)
@@ -74,19 +75,20 @@ public class NoticeService {
                 }
             }
 
-            // 5. 최종 DB 저장 (Notice와 NoticeFile이 함께 저장됨)
+            // 최종 DB 저장 (Notice와 NoticeFile이 함께 저장됨)
+            System.out.println(notice.getIsImportant());
             noticeRepository.save(notice);
 
         } catch (Exception e) {
             rollbackS3Uploads(uploadedKeys);
-            throw new RuntimeException("공지사항 등록 중 오류가 발생했습니다: " + e.getMessage());
+            throw new CustomException("공지사항 등록 중 오류가 발생했습니다: " + e.getMessage());
         }
     }
 
     // 검증 로직
     private void validateNotice(NoticeWriteDTO dto) {
-        if (dto.getFiles() != null && dto.getFiles().size() > 10) throw new RuntimeException("파일은 최대 10개까지입니다.");
-        if (dto.getTitle() == null || dto.getTitle().isBlank()) throw new RuntimeException("제목을 입력해주세요.");
+        if (dto.getFiles() != null && dto.getFiles().size() > 10) throw new CustomException("파일은 최대 10개까지입니다.");
+        if (dto.getTitle() == null || dto.getTitle().isBlank()) throw new CustomException("제목을 입력해주세요.");
     }
 
     // S3 롤백 로직
@@ -124,7 +126,7 @@ public class NoticeService {
     public NoticeResponseDTO getNoticeDetail(Long id) {
         // ID로 공지사항 조회
         Notice notice = noticeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("해당 공지사항을 찾을 수 없습니다."));
+                .orElseThrow(() -> new CustomException("해당 공지사항을 찾을 수 없습니다."));
 
         // DTO로 변환하여 반환
         return new NoticeResponseDTO(
@@ -138,5 +140,79 @@ public class NoticeService {
                                 file.getFileUrl()))
                         .toList()
         );
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    public void update(Long id, NoticeWriteDTO noticeWriteDTO) {
+        List<String> uploadedKeys = new ArrayList<>();
+
+        try {
+            validateNotice(noticeWriteDTO);
+
+            Notice notice = noticeRepository.findById(id)
+                    .orElseThrow(() -> new CustomException("해당 공지사항을 찾을 수 없습니다."));
+
+            // 본문 이미지 치환 및 S3 업로드
+            String newHtmlSource = util.replaceHtmlContent(
+                    noticeWriteDTO.getContent(),
+                    "images",
+                    uploadedKeys
+            );
+
+            // 기존 첨부파일 중 본문에서 사용되지 않는 파일만 삭제
+            List<NoticeFile> filesToKeep = new ArrayList<>();
+            for (NoticeFile oldFile : notice.getFiles()) {
+                if (newHtmlSource.contains(oldFile.getFileUrl())) {
+                    filesToKeep.add(oldFile);
+                } else {
+                    String url = oldFile.getFileUrl();
+                    String key = url.substring(url.indexOf(".com/") + 5);
+                    s3UploadService.delete(key);
+                }
+            }
+            notice.getFiles().clear();
+            filesToKeep.forEach(notice::addFile);
+
+            // 새 첨부파일 등록
+            if (noticeWriteDTO.getFiles() != null && !noticeWriteDTO.getFiles().isEmpty()) {
+                for (MultipartFile file : noticeWriteDTO.getFiles()) {
+                    if (file.isEmpty()) continue;
+
+                    String originalName = file.getOriginalFilename();
+                    String extension = "";
+                    if (originalName != null && originalName.contains(".")) {
+                        extension = originalName.substring(originalName.lastIndexOf("."));
+                    }
+
+                    String typeFolder = s3UploadService.getFolderByContentType(file.getContentType());
+                    String key = "attachments/" + typeFolder + "/" + UUID.randomUUID() + extension;
+
+                    String url = s3UploadService.upload(key, file);
+                    uploadedKeys.add(key);
+
+                    NoticeFile noticeFile = new NoticeFile(originalName, url, notice);
+                    notice.addFile(noticeFile);
+                }
+            }
+
+            // 공지사항 내용/제목/중요도 업데이트
+            notice.update(
+                    noticeWriteDTO.getTitle(),
+                    newHtmlSource,
+                    noticeWriteDTO.getIsImportant()
+            );
+
+        } catch (Exception e) {
+            rollbackS3Uploads(uploadedKeys);
+            throw new CustomException("공지사항 수정 중 오류가 발생했습니다: " + e.getMessage());
+        }
+    }
+
+    // 공지사항 삭제
+    public void deleteNotice(Long id) {
+        if (!noticeRepository.existsById(id)) {
+            throw new CustomException("존재하지 않는 공지사항입니다. id: " + id);
+        }
+        noticeRepository.deleteById(id);
     }
 }

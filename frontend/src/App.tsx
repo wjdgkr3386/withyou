@@ -36,6 +36,7 @@ function App() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/account/find" element={<AccountFindPage />} />
         <Route path="/notice/write" element={<NoticeWritePage />} />
+        <Route path="/notice/edit/:id" element={<NoticeWritePage />} />
         <Route path="/change-password" element={<PasswordChangePage />} />
         
         {/* 네비바/푸터가 필요한 페이지들 */}

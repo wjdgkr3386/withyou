@@ -41,4 +41,14 @@ public class Notice {
         file.setNotice(this);
     }
 
+    public void update(String title, String content, Boolean isImportant) {
+        this.title = title;
+        this.content = content;
+        this.isImportant = isImportant;
+    }
+
+    public void clearFiles() {
+        this.files.clear();
+    }
+
 }

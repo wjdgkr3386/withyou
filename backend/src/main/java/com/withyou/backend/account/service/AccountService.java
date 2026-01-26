@@ -216,7 +216,9 @@ public class AccountService {
         );
     }
 
+    // ===================
     // 비밀번호 변경
+    // ===================
     public void updatePassword(String username, PasswordChangeDTO request) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다."));
@@ -232,7 +234,14 @@ public class AccountService {
         userRepository.save(user);
     }
 
+    // ===================
+    // 로그아웃
+    // ===================
     public void logout(String username) {
-        redisTemplate.delete("RT:" + username);
+        try {
+            redisTemplate.delete("RT:" + username);
+        }catch(Exception e){
+            throw new CustomException("로그아웃 도중 오류가 발생했습니다. : "+e.getMessage());
+        }
     }
 }

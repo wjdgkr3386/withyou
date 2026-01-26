@@ -1,6 +1,7 @@
 package com.withyou.backend.account.controller;
 
 import com.withyou.backend.account.dto.FindDTO;
+import com.withyou.backend.account.dto.LoginResponse;
 import com.withyou.backend.account.service.AccountService;
 import com.withyou.backend.account.dto.LoginDTO;
 import com.withyou.backend.account.dto.SignupDTO;
@@ -10,6 +11,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -109,13 +112,22 @@ public class AccountController {
 
     // 네비바 로그인 롹인
     @GetMapping("/me")
-    public ResponseEntity<ApiResponse<String>> getMyInfo() {
-        String username = org.springframework.security.core.context.SecurityContextHolder
-                .getContext().getAuthentication().getName();
+    public ResponseEntity<ApiResponse<LoginResponse>> getMyInfo() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        // 이름 확인
+        String username = authentication.getName();
+        // 권한 확인
+        String role = authentication.getAuthorities().stream()
+                .findFirst()
+                .map(GrantedAuthority::getAuthority)
+                .orElse("ROLE_USER").replace("ROLE_", "");
+
         if (username == null || username.equals("anonymousUser")) {
             return ResponseEntity.status(401).body(ApiResponse.error("로그인 필요"));
         }
-        return ResponseEntity.ok(ApiResponse.success("조회 성공", username));
+
+        LoginResponse response = new LoginResponse(username, role);
+        return ResponseEntity.ok(ApiResponse.success("조회 성공", response));
     }
 
     // =========================================================

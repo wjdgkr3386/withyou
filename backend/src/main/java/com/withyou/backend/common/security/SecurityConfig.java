@@ -95,16 +95,18 @@ public class SecurityConfig {
                         // 로그인 사용자 전용
                         .requestMatchers(
                                 "/api/users/me",
+                                "/api/logout",
                                 "/api/mypage/profile",
                                 "/api/mypage/password"
                         ).authenticated()
 
                         // 관리자 전용
                         .requestMatchers(
-                                "/api/notice/write"
+                                "/api/notice/write",
+                                "/api/notice/*"
                         ).hasRole("ADMIN")
 
-                        // 그 외
+                        // 그 외 요청은 인증 필요
                         .anyRequest().authenticated()
                 )
                 .userDetailsService(customUserDetailsService)

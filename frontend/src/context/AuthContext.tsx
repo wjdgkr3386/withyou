@@ -2,16 +2,21 @@ import React, { createContext, useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
 
+interface User {
+    username: string;
+    role: string;
+}
+
 interface AuthContextType {
-    user: string | null;
-    setUser: React.Dispatch<React.SetStateAction<string | null>>;
+    user: User | null;
+    setUser: React.Dispatch<React.SetStateAction<User | null>>;
     checkLoginStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-    const [user, setUser] = useState<string | null>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const location = useLocation();
 
@@ -27,7 +32,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             );
 
             if (res.data.success) {
-                setUser(res.data.data); // username
+                setUser({
+                    username: res.data.data.username,
+                    role: res.data.data.role,
+                });
             }
         } catch {
             setUser(null);

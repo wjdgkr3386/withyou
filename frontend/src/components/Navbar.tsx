@@ -68,7 +68,7 @@ function Navbar() {
                                     className="text-decoration-none text-dark fw-bold me-2"
                                     style={({ isActive }) => ({ color: isActive ? 'var(--bs-primary)' : 'inherit' })}
                                 >
-                                    {user}님
+                                    {user.username}님
                                 </NavLink>
                                 <button onClick={handleLogout} className="btn btn-outline-danger btn-sm rounded-pill px-3">로그아웃</button>
                             </>

@@ -8,13 +8,13 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
-@Getter
-@Setter
 @AllArgsConstructor
 @NoArgsConstructor
+@Getter
+@Setter
 public class NoticeWriteDTO {
     private String title;
     private String content;
-    private boolean isImportant;
+    private Boolean isImportant;
     private List<MultipartFile> files;
 }
