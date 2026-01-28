@@ -9,23 +9,12 @@ import MainPage from './pages/MainPage';
 import AboutPage from './pages/AboutPage';
 import ClassPage from './pages/ClassPage';
 import ExamPage from './pages/ExamPage';
+import ProblemPage from './pages/ProblemPage';
 import NoticePage from './pages/NoticePage';
 import NoticeWritePage from './pages/NoticeWritePage';
 import NoticeDetailPage from './pages/NoticeDetailPage';
 import MyPage from './pages/MyPage';
 import PasswordChangePage from './pages/PasswordChangePage';
-
-
-// 공통 레이아웃 컴포넌트 (Navbar와 Footer를 포함)
-function Layout({ children }: { children: React.ReactNode }) {
-  return (
-    <>
-      <Navbar />
-      <main style={{ minHeight: '80vh' }}>{children}</main>
-      <Footer />
-    </>
-  );
-}
 
 function App() {
   return (
@@ -40,13 +29,14 @@ function App() {
         <Route path="/change-password" element={<PasswordChangePage />} />
         
         {/* 네비바/푸터가 필요한 페이지들 */}
-        <Route path="/" element={<Layout><MainPage /></Layout>} />
-        <Route path="/about" element={<Layout><AboutPage /></Layout>} />
-        <Route path="/class" element={<Layout><ClassPage /></Layout>} />
-        <Route path="/exam" element={<Layout><ExamPage /></Layout>} />
-        <Route path="/notice" element={<Layout><NoticePage /></Layout>} />
-        <Route path="/notice/detail/:id" element={<Layout><NoticeDetailPage /></Layout>} />
-        <Route path="/mypage" element={<Layout><MyPage /></Layout>} />
+        <Route path="/" element={<><Navbar/><MainPage /><Footer/></>} />
+        <Route path="/about" element={<><Navbar/><AboutPage /><Footer/></>} />
+        <Route path="/class" element={<><Navbar/><ClassPage /><Footer/></>} />
+        <Route path="/exam" element={<><Navbar/><ExamPage /><Footer/></>} />
+        <Route path="/problem" element={<><Navbar/><ProblemPage /></>} />
+        <Route path="/notice" element={<><Navbar/><NoticePage /><Footer/></>} />
+        <Route path="/notice/detail/:id" element={<><Navbar/><NoticeDetailPage/><Footer/></>} />
+        <Route path="/mypage" element={<><Navbar/><MyPage /><Footer/></>} />
       </Routes>
     </AuthProvider>
   );
