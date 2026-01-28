@@ -21,22 +21,22 @@ function App() {
     <AuthProvider>
       <Routes>
         {/* 네비바/푸터가 없는 페이지 */}
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/signup" element={<SignupPage />} />
-        <Route path="/account/find" element={<AccountFindPage />} />
-        <Route path="/notice/write" element={<NoticeWritePage />} />
-        <Route path="/notice/edit/:id" element={<NoticeWritePage />} />
-        <Route path="/change-password" element={<PasswordChangePage />} />
+        <Route path="/login"              element={<LoginPage />} />
+        <Route path="/signup"             element={<SignupPage />} />
+        <Route path="/account/find"       element={<AccountFindPage />} />
+        <Route path="/notice/write"       element={<NoticeWritePage />} />
+        <Route path="/notice/edit/:id"    element={<NoticeWritePage />} />
+        <Route path="/change-password"    element={<PasswordChangePage />} />
         
         {/* 네비바/푸터가 필요한 페이지들 */}
-        <Route path="/" element={<><Navbar/><MainPage /><Footer/></>} />
-        <Route path="/about" element={<><Navbar/><AboutPage /><Footer/></>} />
-        <Route path="/class" element={<><Navbar/><ClassPage /><Footer/></>} />
-        <Route path="/exam" element={<><Navbar/><ExamPage /><Footer/></>} />
-        <Route path="/problem" element={<><Navbar/><ProblemPage /></>} />
-        <Route path="/notice" element={<><Navbar/><NoticePage /><Footer/></>} />
-        <Route path="/notice/detail/:id" element={<><Navbar/><NoticeDetailPage/><Footer/></>} />
-        <Route path="/mypage" element={<><Navbar/><MyPage /><Footer/></>} />
+        <Route path="/"                   element={<> <Navbar/><MainPage /><Footer/>        </>} />
+        <Route path="/about"              element={<> <Navbar/><AboutPage /><Footer/>       </>} />
+        <Route path="/class"              element={<> <Navbar/><ClassPage /><Footer/>       </>} />
+        <Route path="/exam"               element={<> <Navbar/><ExamPage /><Footer/>        </>} />
+        <Route path="/problem"            element={<> <Navbar/><ProblemPage />              </>} />
+        <Route path="/notice"             element={<> <Navbar/><NoticePage /><Footer/>      </>} />
+        <Route path="/notice/detail/:id"  element={<> <Navbar/><NoticeDetailPage/><Footer/> </>} />
+        <Route path="/mypage"             element={<> <Navbar/><MyPage /><Footer/>          </>} />
       </Routes>
     </AuthProvider>
   );
