@@ -54,9 +54,13 @@ function Navbar() {
                         <li className="nav-item">
                             <NavLink className="nav-link px-3" style={navLinkStyle} to="/exam">시험</NavLink>
                         </li>
-                        <li className="nav-item">
-                            <NavLink className="nav-link px-3" style={navLinkStyle} to="/problem">문제은행</NavLink>
-                        </li>
+                        {user?.role === 'ADMIN' && (
+                            <li className="nav-item">
+                                <NavLink className="nav-link px-3" style={navLinkStyle} to="/problembank">
+                                    문제은행
+                                </NavLink>
+                            </li>
+                        )}
                         <li className="nav-item">
                             <NavLink className="nav-link px-3" style={navLinkStyle} to="/notice">공지사항</NavLink>
                         </li>

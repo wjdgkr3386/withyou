@@ -103,7 +103,8 @@ public class SecurityConfig {
                         // 관리자 전용
                         .requestMatchers(
                                 "/api/notice/write",
-                                "/api/notice/*"
+                                "/api/notice/*",
+                                "/api/problem/*"
                         ).hasRole("ADMIN")
 
                         // 그 외 요청은 인증 필요

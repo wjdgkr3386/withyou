@@ -44,7 +44,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<?> handleRuntimeException(RuntimeException e) {
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("서버 오류가 발생했습니다."));
+                .body(ApiResponse.error("서버 오류가 발생했습니다. : " + e));
     }
 
     // 사용자 정의 예외 처리

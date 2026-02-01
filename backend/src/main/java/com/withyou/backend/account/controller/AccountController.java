@@ -31,9 +31,7 @@ public class AccountController {
 
     @PostMapping("/signup")
     public ResponseEntity<ApiResponse<Void>> signup(@RequestBody SignupDTO request) {
-        System.out.println(1);
         accountService.signup(request);
-        System.out.println(2);
         return ResponseEntity.ok(ApiResponse.success("회원가입 성공", null));
     }
 

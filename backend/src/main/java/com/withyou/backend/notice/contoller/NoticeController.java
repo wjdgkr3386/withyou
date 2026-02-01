@@ -23,6 +23,7 @@ public class NoticeController {
     @PostMapping(value = "/write", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<Void>> write(NoticeWriteDTO noticeWriteDTO){
         System.out.println("NoticeController - write");
+        noticeService.write(noticeWriteDTO);
         return ResponseEntity.ok(ApiResponse.success("공지사항 생성 성공", null));
     }
 

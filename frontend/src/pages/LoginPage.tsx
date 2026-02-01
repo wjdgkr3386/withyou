@@ -41,6 +41,8 @@ function LoginPage() {
                     alert('아이디 또는 비밀번호를 확인하세요.');
                     return;
                 }
+
+                console.error(status + " : " + message);
             }
 
             alert('로그인 중 오류가 발생했습니다.');

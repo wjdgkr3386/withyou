@@ -74,10 +74,7 @@ function NoticePage() {
                                                                 필독
                                                             </span>
                                                         )}
-                                                        <span className={`${notice.isImportant ? 'fw-bold' : ''} text-dark fs-6`}>
-                                                            {notice.isImportant && '[필수] '}
-                                                            {notice.title}
-                                                        </span>
+                                                        {notice.title}
                                                     </div>
                                                 </td>
                                                 <td className="text-center">

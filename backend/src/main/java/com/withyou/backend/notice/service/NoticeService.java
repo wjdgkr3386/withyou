@@ -55,7 +55,6 @@ public class NoticeService {
                 for (MultipartFile file : noticeWriteDTO.getFiles()) {
                     if (file.isEmpty()) continue;
 
-
                     // S3 저장 경로(Key) 생성
                     String originalName = file.getOriginalFilename();
                     String extension = "";
@@ -63,7 +62,7 @@ public class NoticeService {
                         extension = originalName.substring(originalName.lastIndexOf("."));
                     }
                     String typeFolder = s3UploadService.getFolderByContentType(file.getContentType());
-                    String key = "attachments/" + typeFolder + "/" + UUID.randomUUID() + extension;
+                    String key = typeFolder + "/" + UUID.randomUUID() + extension;
 
                     // S3 업로드 및 키 기록
                     String url = s3UploadService.upload(key, file);
@@ -185,7 +184,7 @@ public class NoticeService {
                     }
 
                     String typeFolder = s3UploadService.getFolderByContentType(file.getContentType());
-                    String key = "attachments/" + typeFolder + "/" + UUID.randomUUID() + extension;
+                    String key = typeFolder + "/" + UUID.randomUUID() + extension;
 
                     String url = s3UploadService.upload(key, file);
                     uploadedKeys.add(key);
