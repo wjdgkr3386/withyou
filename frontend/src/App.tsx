@@ -10,8 +10,6 @@ import MainPage from './pages/MainPage';
 import AboutPage from './pages/AboutPage';
 import ClassPage from './pages/ClassPage';
 import ExamPage from './pages/ExamPage';
-import ProblemPage from './pages/ProblemPage';
-import ProblemBankPage from './pages/ProblemBankPage';
 import NoticePage from './pages/NoticePage';
 import NoticeWritePage from './pages/NoticeWritePage';
 import NoticeDetailPage from './pages/NoticeDetailPage';
@@ -42,8 +40,6 @@ function App() {
         <Route path="/admin"              element={<AdminRoute><AdminPage /></AdminRoute>} />
         <Route path="/notice/write"       element={<AdminRoute><NoticeWritePage /></AdminRoute>} />
         <Route path="/notice/edit/:id"    element={<AdminRoute><NoticeWritePage /></AdminRoute>} />
-        <Route path="/problem"            element={<AdminRoute><Navbar/><ProblemPage /></AdminRoute>} />
-        <Route path="/problembank"        element={<AdminRoute><Navbar/><ProblemBankPage /></AdminRoute>} />
       </Routes>
     </AuthProvider>
   );

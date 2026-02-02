@@ -424,24 +424,23 @@ function SignupPage() {
                             required
                         >
                             <option value="">선택</option>
-                            <optgroup label="초등학교">
-                                <option value="E1">초1</option>
-                                <option value="E2">초2</option>
-                                <option value="E3">초3</option>
-                                <option value="E4">초4</option>
-                                <option value="E5">초5</option>
-                                <option value="E6">초6</option>
-                            </optgroup>
-                            <optgroup label="중학교">
-                                <option value="M1">중1</option>
-                                <option value="M2">중2</option>
-                                <option value="M3">중3</option>
-                            </optgroup>
-                            <optgroup label="고등학교">
-                                <option value="H1">고1</option>
-                                <option value="H2">고2</option>
-                                <option value="H3">고3</option>
-                            </optgroup>
+                            <optgroup label="────────────────────"></optgroup>
+                            <option value="E1">초등학교 1학년</option>
+                            <option value="E2">초등학교 2학년</option>
+                            <option value="E3">초등학교 3학년</option>
+                            <option value="E4">초등학교 4학년</option>
+                            <option value="E5">초등학교 5학년</option>
+                            <option value="E6">초등학교 6학년</option>
+                            <optgroup label="────────────────────"></optgroup>
+                            <option value="M1">중학교 1학년</option>
+                            <option value="M2">중학교 2학년</option>
+                            <option value="M3">중학교 3학년</option>
+                            <optgroup label="────────────────────"></optgroup>
+                            <option value="H1">고등학교 1학년</option>
+                            <option value="H2">고등학교 2학년</option>
+                            <option value="H3">고등학교 3학년</option>
+                            <optgroup label="────────────────────"></optgroup>
+                            <option value="ADULT">성인</option>
                         </select>
                     </div>
 
