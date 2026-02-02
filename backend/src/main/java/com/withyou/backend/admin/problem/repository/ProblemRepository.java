@@ -1,9 +1,9 @@
-package com.withyou.backend.problem.repository;
+package com.withyou.backend.admin.problem.repository;
 
 import com.withyou.backend.account.entity.Grade;
-import com.withyou.backend.problem.entity.Problem;
-import com.withyou.backend.problem.entity.ProblemDifficulty;
-import com.withyou.backend.problem.entity.ProblemType;
+import com.withyou.backend.admin.problem.entity.Problem;
+import com.withyou.backend.admin.problem.entity.ProblemDifficulty;
+import com.withyou.backend.admin.problem.entity.ProblemType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -29,6 +29,20 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
             @Param("difficulty") ProblemDifficulty difficulty,
             @Param("type") ProblemType type,
             Pageable pageable
+    );
+
+    @Query("""
+    select count(p) from Problem p
+    where (:grade is null or p.grade = :grade)
+      and (:category is null or p.category = :category)
+      and (:difficulty is null or p.difficulty = :difficulty)
+      and (:type is null or p.type = :type)
+    """)
+    long countByFilter(
+            @Param("grade") Grade grade,
+            @Param("category") String category,
+            @Param("difficulty") ProblemDifficulty difficulty,
+            @Param("type") ProblemType type
     );
 
 }

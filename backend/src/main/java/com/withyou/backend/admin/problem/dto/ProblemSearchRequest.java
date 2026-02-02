@@ -1,8 +1,8 @@
-package com.withyou.backend.problem.dto;
+package com.withyou.backend.admin.problem.dto;
 
 import com.withyou.backend.account.entity.Grade;
-import com.withyou.backend.problem.entity.ProblemDifficulty;
-import com.withyou.backend.problem.entity.ProblemType;
+import com.withyou.backend.admin.problem.entity.ProblemDifficulty;
+import com.withyou.backend.admin.problem.entity.ProblemType;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -13,4 +13,5 @@ public class ProblemSearchRequest {
     private String category;
     private ProblemDifficulty difficulty;
     private ProblemType type;
+    private int page;
 }

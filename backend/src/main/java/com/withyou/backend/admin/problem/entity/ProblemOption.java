@@ -1,4 +1,4 @@
-package com.withyou.backend.problem.entity;
+package com.withyou.backend.admin.problem.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
 import jakarta.persistence.*;

@@ -1,10 +1,10 @@
-package com.withyou.backend.problem.controller;
+package com.withyou.backend.admin.problem.controller;
 
 import com.withyou.backend.common.ApiResponse;
-import com.withyou.backend.problem.dto.ProblemCreateRequest;
-import com.withyou.backend.problem.dto.ProblemSearchRequest;
-import com.withyou.backend.problem.dto.ProblemSearchResponse;
-import com.withyou.backend.problem.service.ProblemService;
+import com.withyou.backend.admin.problem.dto.ProblemCreateRequest;
+import com.withyou.backend.admin.problem.dto.ProblemSearchRequest;
+import com.withyou.backend.admin.problem.dto.ProblemSearchResponse;
+import com.withyou.backend.admin.problem.service.ProblemService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -12,11 +12,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
-
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/problem")
+@RequestMapping("/api/admin/problem")
 public class ProblemController {
 
     private final ProblemService problemService;

@@ -1,14 +1,15 @@
-package com.withyou.backend.problem.service;
+package com.withyou.backend.admin.problem.service;
 
 import com.withyou.backend.common.exception.CustomException;
 import com.withyou.backend.common.s3.S3UploadService;
-import com.withyou.backend.problem.dto.ProblemCreateRequest;
-import com.withyou.backend.problem.dto.ProblemSearchRequest;
-import com.withyou.backend.problem.dto.ProblemSearchResponse;
-import com.withyou.backend.problem.entity.Problem;
-import com.withyou.backend.problem.entity.ProblemType;
-import com.withyou.backend.problem.repository.ProblemRepository;
+import com.withyou.backend.admin.problem.dto.ProblemCreateRequest;
+import com.withyou.backend.admin.problem.dto.ProblemSearchRequest;
+import com.withyou.backend.admin.problem.dto.ProblemSearchResponse;
+import com.withyou.backend.admin.problem.entity.Problem;
+import com.withyou.backend.admin.problem.entity.ProblemType;
+import com.withyou.backend.admin.problem.repository.ProblemRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -140,21 +141,26 @@ public class ProblemService {
     // ===========================
     public ProblemSearchResponse search(ProblemSearchRequest request) {
 
-        Problem problem = problemRepository
-                .findByFilterWithOptions(
-                        request.getGrade(),
-                        request.getCategory(),
-                        request.getDifficulty(),
-                        request.getType(),
-                        PageRequest.of(0, 1)
-                )
-                .stream()
-                .findFirst()
-                .orElse(null);
+        List<Problem> problems = problemRepository.findByFilterWithOptions(
+                request.getGrade(),
+                request.getCategory(),
+                request.getDifficulty(),
+                request.getType(),
+                PageRequest.of(request.getPage(), 1)
+        );
 
-        if (problem == null) {
+        if (problems.isEmpty()) {
             return null;
         }
+
+        long totalCount = problemRepository.countByFilter(
+                request.getGrade(),
+                request.getCategory(),
+                request.getDifficulty(),
+                request.getType()
+        );
+
+        Problem problem = problems.get(0);
 
         return new ProblemSearchResponse(
                 problem.getId(),
@@ -165,7 +171,9 @@ public class ProblemService {
                 problem.getDifficulty(),
                 problem.getAnswer(),
                 problem.getImageUrl(),
-                problem.getOptions()
+                problem.getOptions(),
+                totalCount,                // 전체 개수
+                request.getPage() + 1      // 현재 순서 (0페이지면 1번)
         );
     }
 

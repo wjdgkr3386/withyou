@@ -1,8 +1,8 @@
-package com.withyou.backend.problem.entity;
+package com.withyou.backend.admin.problem.entity;
 
 import com.withyou.backend.account.entity.Grade;
 import com.withyou.backend.common.entity.BaseEntity;
-import com.withyou.backend.problem.dto.ProblemCreateRequest;
+import com.withyou.backend.admin.problem.dto.ProblemCreateRequest;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;

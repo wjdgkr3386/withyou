@@ -1,8 +1,8 @@
-package com.withyou.backend.problem.dto;
+package com.withyou.backend.admin.problem.dto;
 
 import com.withyou.backend.account.entity.Grade;
-import com.withyou.backend.problem.entity.ProblemDifficulty;
-import com.withyou.backend.problem.entity.ProblemType;
+import com.withyou.backend.admin.problem.entity.ProblemDifficulty;
+import com.withyou.backend.admin.problem.entity.ProblemType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
