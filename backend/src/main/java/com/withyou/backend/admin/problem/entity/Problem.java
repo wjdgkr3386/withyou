@@ -65,6 +65,28 @@ public class Problem extends BaseEntity {
         return problem;
     }
 
+    public void update(ProblemCreateRequest req, String imageUrl) {
+        this.grade = req.getGrade();
+        this.category = req.getCategory();
+        this.content = req.getContent();
+        this.type = req.getType();
+        this.difficulty = req.getDifficulty();
+        this.answer = req.getAnswer();
+        this.imageUrl = imageUrl;
+
+        // 기존 options 삭제
+        this.options.clear();
+
+        // 객관식인 경우 새로운 options 추가
+        if (req.getType() == ProblemType.객관식 && req.getOptions() != null) {
+            for (int i = 0; i < req.getOptions().size(); i++) {
+                this.options.add(
+                        new ProblemOption(this, i + 1, req.getOptions().get(i))
+                );
+            }
+        }
+    }
+
     @Override
     public String toString() {
         return "Problem{" +

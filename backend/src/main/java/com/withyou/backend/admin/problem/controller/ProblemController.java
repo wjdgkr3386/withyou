@@ -37,4 +37,22 @@ public class ProblemController {
         ProblemSearchResponse response = problemService.search(request);
         return ResponseEntity.ok(ApiResponse.success("문제 검색 성공", response));
     }
+
+    // 문제 수정
+    @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<Void>> updateProblem(
+            @PathVariable Long id,
+            @Valid @RequestPart("problem") ProblemCreateRequest request,
+            @RequestPart(value = "image", required = false) MultipartFile image
+    ) {
+        problemService.update(id, request, image);
+        return ResponseEntity.ok(ApiResponse.success("문제 수정 성공", null));
+    }
+
+    // 문제 삭제
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteProblem(@PathVariable Long id) {
+        problemService.delete(id);
+        return ResponseEntity.ok(ApiResponse.success("문제 삭제 성공", null));
+    }
 }

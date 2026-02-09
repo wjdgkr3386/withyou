@@ -31,7 +31,7 @@ function App() {
         <Route path="/"                   element={<> <Navbar/><MainPage /><Footer/>        </>} />
         <Route path="/about"              element={<> <Navbar/><AboutPage /><Footer/>       </>} />
         <Route path="/class"              element={<> <Navbar/><ClassPage /><Footer/>       </>} />
-        <Route path="/exam"               element={<> <Navbar/><ExamPage /><Footer/>        </>} />
+        <Route path="/exam"               element={<> <Navbar/><ExamPage />                 </>} />
         <Route path="/notice"             element={<> <Navbar/><NoticePage /><Footer/>      </>} />
         <Route path="/notice/detail/:id"  element={<> <Navbar/><NoticeDetailPage/><Footer/> </>} />
         <Route path="/mypage"             element={<> <Navbar/><MyPage /><Footer/>          </>} />

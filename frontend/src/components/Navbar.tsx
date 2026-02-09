@@ -54,13 +54,6 @@ function Navbar() {
                         <li className="nav-item">
                             <NavLink className="nav-link px-3" style={navLinkStyle} to="/exam">시험</NavLink>
                         </li>
-                        {user?.role === 'ADMIN' && (
-                            <li className="nav-item">
-                                <NavLink className="nav-link px-3" style={navLinkStyle} to="/problembank">
-                                    문제은행
-                                </NavLink>
-                            </li>
-                        )}
                         <li className="nav-item">
                             <NavLink className="nav-link px-3" style={navLinkStyle} to="/notice">공지사항</NavLink>
                         </li>
@@ -70,6 +63,15 @@ function Navbar() {
                     <div className="d-flex gap-2 align-items-center justify-content-center mt-3 mt-lg-0">
                         {user ? (
                             <>
+                                {user && user.role === 'ADMIN' && (
+                                    <NavLink
+                                        to="/admin"
+                                        className="btn btn-outline-dark btn-sm rounded-pill px-3"
+                                        style={{ cursor: 'pointer' }}
+                                    >
+                                        관리자
+                                    </NavLink>
+                                )}
                                 <NavLink 
                                     to="/mypage" 
                                     className="text-decoration-none text-dark fw-bold me-2"

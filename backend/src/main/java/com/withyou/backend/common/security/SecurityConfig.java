@@ -97,7 +97,8 @@ public class SecurityConfig {
                                 "/api/users/me",
                                 "/api/logout",
                                 "/api/mypage/profile",
-                                "/api/mypage/password"
+                                "/api/mypage/password",
+                                "/ws-stomp/**"
                         ).authenticated()
 
                         // 관리자 전용

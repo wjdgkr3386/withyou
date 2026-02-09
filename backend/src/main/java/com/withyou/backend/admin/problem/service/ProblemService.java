@@ -177,4 +177,97 @@ public class ProblemService {
         );
     }
 
+    /* ===========================
+       문제 수정
+    ============================ */
+    public void update(Long id, ProblemCreateRequest request, MultipartFile image) {
+
+        // 1. 기존 문제 조회
+        Problem problem = problemRepository.findById(id)
+                .orElseThrow(() -> new CustomException("문제를 찾을 수 없습니다."));
+
+        // 2. 검증
+        validate(request);
+
+        String newImageUrl = problem.getImageUrl();
+        String uploadedKey = null;
+        String oldImageKey = null;
+
+        try {
+            // 3. 새 이미지가 있는 경우
+            if (image != null && !image.isEmpty()) {
+                // 기존 이미지 키 저장 (나중에 삭제용)
+                if (problem.getImageUrl() != null) {
+                    oldImageKey = extractKeyFromUrl(problem.getImageUrl());
+                }
+
+                // 새 이미지 업로드
+                UploadResult uploadResult = uploadImage(image);
+                newImageUrl = uploadResult.url();
+                uploadedKey = uploadResult.key();
+            }
+
+            // 4. 문제 업데이트
+            problem.update(request, newImageUrl);
+            problemRepository.save(problem);
+
+            // 5. 성공 시 기존 이미지 삭제
+            if (oldImageKey != null && uploadedKey != null) {
+                s3UploadService.delete(oldImageKey);
+            }
+
+        } catch (Exception e) {
+            // S3 롤백 - 새로 업로드한 이미지 삭제
+            if (uploadedKey != null) {
+                s3UploadService.delete(uploadedKey);
+            }
+            throw e;
+        }
+    }
+
+    /* ===========================
+       문제 삭제
+    ============================ */
+    public void delete(Long id) {
+
+        // 1. 문제 조회
+        Problem problem = problemRepository.findById(id)
+                .orElseThrow(() -> new CustomException("문제를 찾을 수 없습니다."));
+
+        // 2. 이미지가 있으면 S3에서 삭제
+        if (problem.getImageUrl() != null) {
+            String imageKey = extractKeyFromUrl(problem.getImageUrl());
+            try {
+                s3UploadService.delete(imageKey);
+            } catch (Exception e) {
+                // 이미지 삭제 실패해도 문제 삭제는 진행
+                // 로그만 남기고 계속 진행
+            }
+        }
+
+        // 3. 문제 삭제 (options는 CASCADE로 자동 삭제)
+        problemRepository.delete(problem);
+    }
+
+    /* ===========================
+       URL에서 S3 키 추출
+    ============================ */
+    private String extractKeyFromUrl(String url) {
+        // URL 형식: https://bucket-name.s3.region.amazonaws.com/folder/problem/uuid_filename
+        // 또는: https://cdn-domain/folder/problem/uuid_filename
+
+        try {
+            // CloudFront나 S3 URL에서 키 부분만 추출
+            int keyStartIndex = url.indexOf(".com/");
+            if (keyStartIndex != -1) {
+                return url.substring(keyStartIndex + 5); // ".com/" 이후 부분
+            }
+
+            // 다른 형식의 URL인 경우 전체 URL 반환
+            return url;
+        } catch (Exception e) {
+            return url;
+        }
+    }
+
 }

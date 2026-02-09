@@ -3,6 +3,8 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import 'katex/dist/katex.min.css';
 import { InlineMath } from 'react-katex';
+import SockJS from 'sockjs-client';
+import Stomp from 'stompjs';
 import {
   GRADE_OPTIONS,
   DIFFICULTY_OPTIONS,
@@ -57,7 +59,7 @@ function Admin() {
 
     const [data, setData] = useState<CategoryData>({});
 
-    const menus = ['대시보드', '학생 관리', '문제은행', '시험 관리', '성적 관리', '카테고리 관리'];
+    const menus = ['대시보드', '카테고리 관리', '문제은행', '시험 관리', '학생 관리', '성적 관리',];
     const grades = GRADE_OPTIONS.map(g => g.label);
 
     const currentKey = `${selectedGrade}-${selectedTerm}`;
@@ -92,6 +94,7 @@ function Admin() {
     }
 
     const [problem, setProblem] = useState<ProblemData | null>(null);
+    const [isEditing, setIsEditing] = useState<boolean>(false);
 
     // 문제 생성 상태
     const [problemData, setProblemData] = useState({
@@ -107,6 +110,40 @@ function Admin() {
     const answerRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // 웹소켓 Stomp 설정
+    const stompClient = useRef<Stomp.Client | null>(null);
+    useEffect(() => {
+        // 웹소켓 연결
+        const socket = new SockJS(`${BASE_URL}/ws-stomp`);
+        stompClient.current = Stomp.over(socket);
+
+        stompClient.current.connect({}, (frame) => {
+            console.log('연결됨: ' + frame);
+
+            // 전체 메시지 구독
+            stompClient.current?.subscribe('/topic/receive-msg', (response) => {
+                console.log('전체 메시지:', response.body);
+            });
+
+            // 1:1 메시지 구독 (내 ID가 abc123인 경우)
+            stompClient.current?.subscribe('/user/abc123/topic/private', (response) => {
+                console.log("나에게만 온 메시지: ", response.body);
+            });
+        });
+
+        return () => {
+            if (stompClient.current) stompClient.current.disconnect(() => {});
+        };
+    }, []);
+
+    // 메시지 보내기
+    const sendData = () => {
+        if (stompClient.current?.connected) {
+            // 서버의 @MessageMapping 주소로 데이터 전송
+            stompClient.current.send("/app/send-msg", {}, "안녕 서버!");
+        }
+    };
+    
     // 카테고리 관리 - 데이터 불러오기
     useEffect(() => {
         const fetchCategories = async () => {
@@ -183,6 +220,7 @@ function Admin() {
             const data = response.data.data;
             setProblem(data);
             setPage(pageNum);
+            setIsEditing(false);
         } catch(error) {
             alert("오류가 발생했습니다.\n콘솔을 확인해주세요");
             console.log(error);
@@ -192,6 +230,106 @@ function Admin() {
     const handleSearchClick = () => {
         search(0);
     }
+
+    // 문제 수정 모드로 전환
+    const handleEditProblem = () => {
+        if (!problem) return;
+        
+        // $ 기호 제거하는 함수
+        const removeDollarSigns = (text: string) => {
+            return text.replace(/\$/g, '');
+        };
+
+        // 문제 데이터를 수정 폼에 로드
+        setProblemData({
+            grade: problem.grade,
+            category: problem.category,
+            content: removeDollarSigns(problem.content),
+            type: problem.type as QuestionType,
+            difficulty: problem.difficulty as Difficulty,
+            options: problem.type === '객관식' 
+                ? problem.options.map(opt => removeDollarSigns(opt.content))
+                : ['', '', '', ''],
+            answer: problem.type === '객관식' 
+                ? problem.answer 
+                : removeDollarSigns(problem.answer)
+        });
+
+        // 해당 학년의 카테고리 설정
+        setAvailableCategories(getCategoriesForGrade(problem.grade));
+        
+        // 이미지 미리보기 설정 (있는 경우)
+        if (problem.imageUrl) {
+            setImagePreview(problem.imageUrl);
+        }
+
+        setIsEditing(true);
+    };
+
+    // 문제 수정 취소
+    const handleCancelEdit = () => {
+        setIsEditing(false);
+        setProblemData({
+            grade: '', category: '', content: '', type: '객관식', difficulty: '하',
+            options: ['', '', '', ''], answer: ''
+        });
+        setImage(null);
+        setImagePreview('');
+    };
+
+    // 문제 업데이트
+    const updateProblem = async () => {
+        if (!problem) return;
+        if (!problemData.grade || !problemData.category || !problemData.content.trim()) return alert("필수 항목을 입력해주세요.");
+        if (problemData.type === '객관식' && (!problemData.options.every(opt => opt.trim()) || !problemData.answer)) return alert("객관식 정보를 완성해주세요.");
+        if (problemData.type !== '객관식' && !problemData.answer.trim()) return alert("정답을 입력해주세요.");
+
+        const processedData = {
+            ...problemData,
+            content: wrapWithDollarSigns(problemData.content),
+            options: problemData.options.map(opt => wrapWithDollarSigns(opt)),
+            answer: problemData.type === '객관식' ? problemData.answer : wrapWithDollarSigns(problemData.answer)
+        };
+
+        const formData = new FormData();
+        formData.append('problem', new Blob([JSON.stringify(processedData)], { type: 'application/json' }));
+        if (image) formData.append('image', image);
+
+        try {
+            const response = await axios.put(`${BASE_URL}/api/admin/problem/${problem.id}`, formData, { withCredentials: true });
+            if (response) {
+                alert("문제가 수정되었습니다.");
+                // 수정 후 다시 검색하여 최신 데이터 표시
+                search(page);
+                setIsEditing(false);
+                setProblemData({
+                    grade: '', category: '', content: '', type: '객관식', difficulty: '하',
+                    options: ['', '', '', ''], answer: ''
+                });
+                setImage(null);
+                setImagePreview('');
+            }
+        } catch (error) {
+            console.error('수정 실패', error);
+            alert("서버 전송 중 오류가 발생했습니다.");
+        }
+    };
+
+    // 문제 삭제
+    const deleteProblem = async () => {
+        if (!problem) return;
+        if (!window.confirm("정말로 이 문제를 삭제하시겠습니까?")) return;
+
+        try {
+            await axios.delete(`${BASE_URL}/api/admin/problem/${problem.id}`, { withCredentials: true });
+            alert("문제가 삭제되었습니다.");
+            // 삭제 후 다시 검색
+            search(Math.max(0, page - 1));
+        } catch (error) {
+            console.error('삭제 실패', error);
+            alert("문제 삭제 중 오류가 발생했습니다.");
+        }
+    };
 
     // 학년에 따른 카테고리 목록 가져오기
     const getCategoriesForGrade = (gradeValue: string): string[] => {
@@ -349,7 +487,7 @@ function Admin() {
         <div className="container-fluid d-flex vh-100 p-0">
             {/* 사이드바 */}
             <div className="bg-dark h-100" style={{ width: '20%', minWidth: '230px' }}>
-                <div className="text-info fs-3 ms-3 mt-3 fw-bold">위드유 수학학원</div>
+                <div className="mt-3 ms-3"><span className="text-info fs-3 fw-bold" style={{ cursor: 'pointer'}} onClick={(e) => {navigate('/');}}>위드유 수학학원</span></div>
                 <div className="fs-6 ms-3 mb-4" style={{ color: '#5F9EA0' }}>관리자 시스템</div>
                 {menus.map((menu) => (
                     <div key={menu} onClick={() => setActive(menu)} className={`text-white rounded p-3 mx-3 mb-1 ${active === menu ? 'bg-primary' : ''}`} style={{ cursor: 'pointer', transition: '0.2s' }}>{menu}</div>
@@ -491,62 +629,247 @@ function Admin() {
                                 </div>
 
                                 {problem ? (
-                                    <div id="problem-box" className="rounded p-4" style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}>
-                                        <div className="mb-3">
-                                            <span className="bg-primary-subtle text-primary fw-medium px-3 py-1 rounded-pill me-2">
-                                                {GRADE_MAP[problem.grade] || problem.grade}
-                                            </span>
-                                            <span className="bg-success-subtle text-success fw-medium px-3 py-1 rounded-pill me-2">
-                                                {problem.category}
-                                            </span>
-                                            <span className="bg-info-subtle text-info fw-medium px-3 py-1 rounded-pill me-2">
-                                                {problem.type}
-                                            </span>
-                                            <span className={`fw-medium px-3 py-1 rounded-pill ${
-                                                problem.difficulty === '상' ? 'bg-danger-subtle text-danger' : 
-                                                problem.difficulty === '중' ? 'bg-warning-subtle text-warning' : 'bg-secondary-subtle text-secondary'
-                                            }`}>
-                                                난이도: {problem.difficulty}
-                                            </span>
-                                        </div>
-                                        <hr/>
+                                    <>
+                                        {!isEditing ? (
+                                            <div id="problem-box" className="rounded p-4" style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}>
+                                                <div className="mb-3">
+                                                    <span className="bg-primary-subtle text-primary fw-medium px-3 py-1 rounded-pill me-2">
+                                                        {GRADE_MAP[problem.grade] || problem.grade}
+                                                    </span>
+                                                    <span className="bg-success-subtle text-success fw-medium px-3 py-1 rounded-pill me-2">
+                                                        {problem.category}
+                                                    </span>
+                                                    <span className="bg-info-subtle text-info fw-medium px-3 py-1 rounded-pill me-2">
+                                                        {problem.type}
+                                                    </span>
+                                                    <span className={`fw-medium px-3 py-1 rounded-pill ${
+                                                        problem.difficulty === '상' ? 'bg-danger-subtle text-danger' : 
+                                                        problem.difficulty === '중' ? 'bg-warning-subtle text-warning' : 'bg-secondary-subtle text-secondary'
+                                                    }`}>
+                                                        난이도: {problem.difficulty}
+                                                    </span>
+                                                </div>
+                                                <hr/>
 
-                                        <div className="fw-bold fs-5 mb-3">문제</div>
-                                        <div id="problem-content" className="mb-4">
-                                            {renderProblemContent(problem.content)}
-                                        </div>
-                                        
-                                        <div className="rounded bg-light p-3">
-                                            <div className="fw-bold fs-5 mb-3">정답</div>
-                                            <div className="answer">
-                                                {renderProblemContent(problem.answer)} 
+                                                <div className="fw-bold fs-5 mb-3">문제</div>
+                                                <div id="problem-content" className="mb-4">
+                                                    {renderProblemContent(problem.content)}
+                                                </div>
+                                                
+                                                {/* 객관식인 경우 보기 표시 - 2x2 그리드 */}
+                                                {problem.type === '객관식' && problem.options && problem.options.length > 0 && (
+                                                    <div className="mb-4">
+                                                        <div className="fw-bold fs-6 mb-3">보기</div>
+                                                        <div className="row g-3">
+                                                            {problem.options
+                                                                .sort((a, b) => a.optionNumber - b.optionNumber)
+                                                                .map((option) => {
+                                                                    const circleNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+                                                                    return (
+                                                                        <div key={option.id} className="col-6">
+                                                                            <div className="border rounded p-3 h-100 d-flex align-items-center bg-white">
+                                                                                <span className="fw-bold me-2 fs-5 d-flex align-items-center" style={{ minWidth: '30px', height: '100%' }}>
+                                                                                    {circleNumbers[option.optionNumber - 1] || option.optionNumber}
+                                                                                </span>
+                                                                                <div className="flex-grow-1" style={{ marginTop: '6px' }}> 
+                                                                                    {renderProblemContent(option.content)}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })
+                                                            }
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                
+                                                <div className="rounded bg-light p-3">
+                                                    <div className="fw-bold fs-5 mb-3">정답</div>
+                                                    <div className="answer">
+                                                        {problem.type === '객관식' ? (
+                                                            <span className="fs-4 fw-bold text-primary">{problem.answer}번</span>
+                                                        ) : (
+                                                            renderProblemContent(problem.answer)
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                
+                                                <hr className="border"></hr>
+                                                
+                                                <div className="d-flex justify-content-between align-items-center mb-3">
+                                                    <button 
+                                                        className="btn bg-secondary text-white" 
+                                                        onClick={() => search(page - 1)}
+                                                        disabled={page === 0}
+                                                    >
+                                                        ← 이전
+                                                    </button>
+                                                    
+                                                    <span className="fw-bold">
+                                                        {problem.currentIndex} / {problem.totalCount}
+                                                    </span>
+                                                    
+                                                    <button 
+                                                        className="btn bg-secondary text-white" 
+                                                        onClick={() => search(page + 1)}
+                                                        disabled={problem.currentIndex >= problem.totalCount}
+                                                    >
+                                                        다음 →
+                                                    </button>
+                                                </div>
+
+                                                <div className="d-flex gap-2">
+                                                    <button 
+                                                        className="btn btn-warning flex-fill" 
+                                                        onClick={handleEditProblem}
+                                                    >
+                                                        수정
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-danger flex-fill" 
+                                                        onClick={deleteProblem}
+                                                    >
+                                                        삭제
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                        
-                                        <hr className="border"></hr>
-                                        
-                                        <div className="d-flex justify-content-between align-items-center">
-                                            <button 
-                                                className="btn bg-secondary text-white" 
-                                                onClick={() => search(page - 1)}
-                                                disabled={page === 0}
-                                            >
-                                                ← 이전
-                                            </button>
-                                            
-                                            <span className="fw-bold">
-                                                {problem.currentIndex} / {problem.totalCount}
-                                            </span>
-                                            
-                                            <button 
-                                                className="btn bg-secondary text-white" 
-                                                onClick={() => search(page + 1)}
-                                                disabled={problem.currentIndex >= problem.totalCount}
-                                            >
-                                                다음 →
-                                            </button>
-                                        </div>
-                                    </div>
+                                        ) : (
+                                            <div style={{ padding: '20px', maxWidth: '700px', margin: 'auto', fontFamily: 'sans-serif', color: '#333' }}>
+                                                <div className="d-flex justify-content-between align-items-center mb-4">
+                                                    <h2 style={{ borderBottom: '2px solid #333', paddingBottom: '10px', margin: 0 }}>문제 수정</h2>
+                                                    <button 
+                                                        className="btn btn-secondary"
+                                                        onClick={handleCancelEdit}
+                                                    >
+                                                        취소
+                                                    </button>
+                                                </div>
+
+                                                <section style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                                                    <div style={{ flex: 1 }}>
+                                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>학년 선택</label>
+                                                        <select 
+                                                            style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '4px' }} 
+                                                            value={problemData.grade} 
+                                                            onChange={e => {
+                                                                setProblemData({ ...problemData, grade: e.target.value, category: '' });
+                                                                setAvailableCategories(getCategoriesForGrade(e.target.value));
+                                                            }}
+                                                        >
+                                                            <option value="">학년 선택</option>
+                                                            {GRADE_OPTIONS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
+                                                        </select>
+                                                    </div>
+                                                    <div style={{ flex: 1 }}>
+                                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>과목/단원</label>
+                                                        <select 
+                                                            style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '4px' }} 
+                                                            value={problemData.category} 
+                                                            onChange={e => setProblemData({ ...problemData, category: e.target.value })}
+                                                            disabled={!problemData.grade}
+                                                        >
+                                                            <option value="">과목 선택</option>
+                                                            {availableCategories.length > 0 ? (
+                                                                availableCategories.map(cat => (
+                                                                    <option key={cat} value={cat}>{cat}</option>
+                                                                ))
+                                                            ) : (
+                                                                <option disabled>등록된 카테고리가 없습니다</option>
+                                                            )}
+                                                        </select>
+                                                    </div>
+                                                </section>
+
+                                                <div style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: '10px' }}>
+                                                    {Object.keys(SYMBOL_GROUPS).map(tab => (
+                                                        <button key={tab} onClick={() => setActiveTab(tab as any)} style={{ padding: '10px 20px', cursor: 'pointer', border: 'none', background: activeTab === tab ? '#fff' : '#f0f0f0', borderBottom: activeTab === tab ? '2px solid #007bff' : 'none', fontWeight: activeTab === tab ? 'bold' : 'normal' }}>{tab}</button>
+                                                    ))}
+                                                </div>
+                                                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '15px', background: '#fff', padding: '10px', border: '1px solid #eee' }}>
+                                                    {SYMBOL_GROUPS[activeTab].map(s => (
+                                                        <button key={s.label} onClick={() => addSymbol('content', s.value)} style={{ padding: '8px 12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', background: '#fff' }}>
+                                                            <InlineMath math={s.value === '^{}' ? 'x^{n}' : s.value === '_{}' ? 'x_{n}' : s.label === '분수' ? '\\frac{1}{1}' : s.value} />
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                <textarea ref={textareaRef} style={{ width: '100%', minHeight: '120px', padding: '15px', fontSize: '16px', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '10px', overflow: 'hidden', resize: 'none' }} value={problemData.content} onChange={e => setProblemData({ ...problemData, content: e.target.value })} placeholder="문제를 입력하세요" />
+                                                <div style={{ marginBottom: '10px', padding: '20px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                                                    {problemData.content ? renderContent(problemData.content) : <span style={{ color: '#888' }}>미리보기</span>}
+                                                </div>
+
+                                                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} style={{ marginBottom: '10px' }} />
+                                                {imagePreview && <div style={{ position: 'relative', display: 'inline-block', marginBottom: '20px' }}><img src={imagePreview} alt="preview" style={{ maxWidth: '100px', borderRadius: '4px', border: '1px solid #ddd' }} /><button onClick={removeImage} style={{ position: 'absolute', top: -5, right: -5, background: 'red', color: '#fff', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>×</button></div>}
+
+                                                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                                                    <select style={{ flex: 1, padding: '10px' }} value={problemData.type} onChange={e => setProblemData({ ...problemData, type: e.target.value as QuestionType, options: e.target.value === '객관식' ? ['', '', '', ''] : [''], answer: '' })}>
+                                                        <option value="객관식">객관식</option>
+                                                        <option value="주관식">주관식</option>
+                                                        <option value="빈칸채우기">빈칸 채우기</option>
+                                                    </select>
+                                                    <select style={{ flex: 1, padding: '10px' }} value={problemData.difficulty} onChange={e => setProblemData({ ...problemData, difficulty: e.target.value as Difficulty })}>
+                                                        <option value="하">난이도: 하</option>
+                                                        <option value="중">난이도: 중</option>
+                                                        <option value="상">난이도: 상</option>
+                                                    </select>
+                                                </div>
+
+                                                <div style={{ marginBottom: '30px' }}>
+                                                    <h4>보기 사항</h4>
+                                                    {problemData.options.map((opt, idx) => {
+                                                        const circleNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+                                                        return (
+                                                            <div key={idx} style={{ marginBottom: '10px' }}>
+                                                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                                                    <span>{idx + 1}.</span>
+                                                                    <input style={{ flex: 1, padding: '8px' }} value={opt} onChange={e => { const newOpts = [...problemData.options]; newOpts[idx] = e.target.value; setProblemData({ ...problemData, options: newOpts }); }} />
+                                                                </div>
+                                                                {opt && (
+                                                                    <div style={{ marginLeft: '25px', marginTop: '5px', display: 'flex', gap: '8px' }}>
+                                                                        <span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{circleNumbers[idx]}</span>
+                                                                        <div>{renderContent(opt)}</div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+
+                                                <div style={{ padding: '20px', background: '#f1f3f5', borderRadius: '8px', border: '1px solid #dee2e6', marginBottom: '30px' }}>
+                                                    <strong style={{ display: 'block', marginBottom: '10px' }}>정답 설정</strong>
+                                                    {problemData.type === '객관식' ? (
+                                                        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
+                                                            {problemData.options.map((_, i) => (
+                                                                <label key={i} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                    <input type="radio" name="answer" value={String(i + 1)} checked={problemData.answer === String(i + 1)} onChange={e => setProblemData({ ...problemData, answer: e.target.value })} /> {i + 1}번
+                                                                </label>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <>
+                                                            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                                                                {SYMBOL_GROUPS[activeTab].map(s => (
+                                                                    <button key={s.label} onClick={() => addSymbol('answer', s.value)} style={{ padding: '5px 10px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', background: '#fff' }}>
+                                                                    <InlineMath math={s.value === '^{}' ? 'x^{n}' : s.value === '_{}' ? 'x_{n}' : s.label === '분수' ? '\\frac{1}{1}' : s.value} />
+                                                                    </button>
+                                                                ))}
+                                                            </div>
+                                                            <textarea ref={answerRef} style={{ width: '100%', minHeight: '50px', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '16px', resize: 'none' }} value={problemData.answer} onChange={e => setProblemData({ ...problemData, answer: e.target.value })} placeholder="정답을 입력하세요" />
+                                                            <div style={{ marginTop: '10px' }}>{problemData.answer && renderContent(problemData.answer)}</div>
+                                                        </>
+                                                    )}
+                                                </div>
+
+                                                <button
+                                                    onClick={updateProblem}
+                                                    disabled={!problemData.grade || !problemData.category || !problemData.content.trim() || !problemData.answer}
+                                                    style={{ width: '100%', padding: '15px', background: (!problemData.grade || !problemData.category || !problemData.content.trim() || !problemData.answer) ? '#ccc' : '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' }}
+                                                >
+                                                    수정 완료
+                                                </button>
+                                            </div>
+                                        )}
+                                    </>
                                     
                                 ) : (
                                     <div className="text-center py-5 border rounded">
@@ -631,15 +954,23 @@ function Admin() {
 
                                 <div style={{ marginBottom: '30px' }}>
                                     <h4>보기 사항</h4>
-                                    {problemData.options.map((opt, idx) => (
-                                        <div key={idx} style={{ marginBottom: '10px' }}>
-                                            <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                                <span>{idx + 1}.</span>
-                                                <input style={{ flex: 1, padding: '8px' }} value={opt} onChange={e => { const newOpts = [...problemData.options]; newOpts[idx] = e.target.value; setProblemData({ ...problemData, options: newOpts }); }} />
+                                    {problemData.options.map((opt, idx) => {
+                                        const circleNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
+                                        return (
+                                            <div key={idx} style={{ marginBottom: '10px' }}>
+                                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                                                    <span>{idx + 1}.</span>
+                                                    <input style={{ flex: 1, padding: '8px' }} value={opt} onChange={e => { const newOpts = [...problemData.options]; newOpts[idx] = e.target.value; setProblemData({ ...problemData, options: newOpts }); }} />
+                                                </div>
+                                                {opt && (
+                                                    <div style={{ marginLeft: '25px', marginTop: '5px', display: 'flex', gap: '8px' }}>
+                                                        <span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{circleNumbers[idx]}</span>
+                                                        <div>{renderContent(opt)}</div>
+                                                    </div>
+                                                )}
                                             </div>
-                                            {opt && <div style={{ marginLeft: '25px', marginTop: '5px' }}>{renderContent(opt)}</div>}
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
 
                                 <div style={{ padding: '20px', background: '#f1f3f5', borderRadius: '8px', border: '1px solid #dee2e6', marginBottom: '30px' }}>
