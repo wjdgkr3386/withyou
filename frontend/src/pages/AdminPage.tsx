@@ -102,6 +102,23 @@ function Admin() {
         options: ['', '', '', ''], answer: ''
     });
     
+    interface ExamProblem {
+        problemId: number;
+        content: string;
+        timeLimit: number;
+        imageUrl?: string;
+    }
+
+    interface ConnectedStudent {
+        studentId: string;
+        solvingProblemId?: number;
+        remainingTime?: number;
+    }
+
+    const [examProblems, setExamProblems] = useState<ExamProblem[]>([]);
+    const [connectedStudents, setConnectedStudents] = useState<ConnectedStudent[]>([]);
+    const [examStarted, setExamStarted] = useState(false);
+    
     const [activeTab, setActiveTab] = useState<keyof typeof SYMBOL_GROUPS>('기본/연산');
     const [image, setImage] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string>('');
@@ -129,7 +146,15 @@ function Admin() {
             stompClient.current?.subscribe('/user/abc123/topic/private', (response) => {
                 console.log("나에게만 온 메시지: ", response.body);
             });
-        });
+
+            stompClient.current?.subscribe('/topic/student/status', (res) => {
+                    const status = JSON.parse(res.body);
+                    setConnectedStudents(prev => {
+                        const filtered = prev.filter(s => s.studentId !== status.studentId);
+                        return [...filtered, status];
+                    });
+                });
+            });
 
         return () => {
             if (stompClient.current) stompClient.current.disconnect(() => {});
@@ -140,10 +165,10 @@ function Admin() {
     const sendData = () => {
         if (stompClient.current?.connected) {
             // 서버의 @MessageMapping 주소로 데이터 전송
-            stompClient.current.send("/app/send-msg", {}, "안녕 서버!");
+            stompClient.current.send("/app/send-all", {}, "안녕 서버!");
         }
     };
-    
+
     // 카테고리 관리 - 데이터 불러오기
     useEffect(() => {
         const fetchCategories = async () => {
@@ -319,6 +344,7 @@ function Admin() {
     const deleteProblem = async () => {
         if (!problem) return;
         if (!window.confirm("정말로 이 문제를 삭제하시겠습니까?")) return;
+        if (!window.confirm("진짜진짜 삭제하시겠습니까?")) return;
 
         try {
             await axios.delete(`${BASE_URL}/api/admin/problem/${problem.id}`, { withCredentials: true });
@@ -329,6 +355,22 @@ function Admin() {
             console.error('삭제 실패', error);
             alert("문제 삭제 중 오류가 발생했습니다.");
         }
+    };
+
+    // ===== 시험 시작 =====
+    const startExam = () => {
+        if (!stompClient.current?.connected) {
+            alert("웹소켓이 연결되지 않았습니다.");
+            return;
+        }
+
+        stompClient.current.send(
+            "/app/exam/start",
+            {},
+            JSON.stringify({ problems: examProblems })
+        );
+
+        setExamStarted(true);
     };
 
     // 학년에 따른 카테고리 목록 가져오기
@@ -632,6 +674,30 @@ function Admin() {
                                     <>
                                         {!isEditing ? (
                                             <div id="problem-box" className="rounded p-4" style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}>
+
+                                                <div className="mb-3">
+                                                    <label>
+                                                        <input type="checkbox" onChange={(e) => {                                   
+                                                            if (e.target.checked && problem) {
+                                                                setExamProblems(prev => [
+                                                                    ...prev,
+                                                                    {
+                                                                    problemId: problem.id,
+                                                                    content: problem.content,
+                                                                    timeLimit: 60,
+                                                                    imageUrl: problem.imageUrl
+                                                                    }
+                                                                ]);
+                                                            } else {
+                                                                setExamProblems(prev =>
+                                                                    prev.filter(p => p.problemId !== problem?.id)
+                                                                );
+                                                            }
+                                                        }}
+                                                        /> 시험 문제로 선택
+                                                    </label>
+                                                </div>
+
                                                 <div className="mb-3">
                                                     <span className="bg-primary-subtle text-primary fw-medium px-3 py-1 rounded-pill me-2">
                                                         {GRADE_MAP[problem.grade] || problem.grade}
@@ -656,6 +722,22 @@ function Admin() {
                                                     {renderProblemContent(problem.content)}
                                                 </div>
                                                 
+                                                {/* 이미지 표시 추가 */}
+                                                {problem.imageUrl && (
+                                                    <div className="mb-4">
+                                                        <img 
+                                                            src={problem.imageUrl} 
+                                                            alt="문제 이미지" 
+                                                            style={{ 
+                                                                maxWidth: '100%', 
+                                                                height: 'auto',
+                                                                borderRadius: '8px',
+                                                                border: '1px solid #ddd'
+                                                            }} 
+                                                        />
+                                                    </div>
+                                                )}
+
                                                 {/* 객관식인 경우 보기 표시 - 2x2 그리드 */}
                                                 {problem.type === '객관식' && problem.options && problem.options.length > 0 && (
                                                     <div className="mb-4">
@@ -689,7 +771,7 @@ function Admin() {
                                                         {problem.type === '객관식' ? (
                                                             <span className="fs-4 fw-bold text-primary">{problem.answer}번</span>
                                                         ) : (
-                                                            renderProblemContent(problem.answer)
+                                                            <span className="fs-4 fw-bold text-primary">{renderProblemContent(problem.answer)}</span>
                                                         )}
                                                     </div>
                                                 </div>
@@ -932,14 +1014,14 @@ function Admin() {
                                 </div>
 
                                 <textarea ref={textareaRef} style={{ width: '100%', minHeight: '120px', padding: '15px', fontSize: '16px', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '10px', overflow: 'hidden', resize: 'none' }} value={problemData.content} onChange={e => setProblemData({ ...problemData, content: e.target.value })} placeholder="문제를 입력하세요" />
-                                <div style={{ marginBottom: '10px', padding: '20px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                                <div style={{ marginBottom: '30px', padding: '20px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
                                     {problemData.content ? renderContent(problemData.content) : <span style={{ color: '#888' }}>미리보기</span>}
                                 </div>
 
-                                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} style={{ marginBottom: '10px' }} />
+                                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} style={{ marginBottom: '30px' }} />
                                 {imagePreview && <div style={{ position: 'relative', display: 'inline-block', marginBottom: '20px' }}><img src={imagePreview} alt="preview" style={{ maxWidth: '100px', borderRadius: '4px', border: '1px solid #ddd' }} /><button onClick={removeImage} style={{ position: 'absolute', top: -5, right: -5, background: 'red', color: '#fff', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>×</button></div>}
 
-                                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+                                <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
                                     <select style={{ flex: 1, padding: '10px' }} value={problemData.type} onChange={e => setProblemData({ ...problemData, type: e.target.value as QuestionType, options: e.target.value === '객관식' ? ['', '', '', ''] : [''], answer: '' })}>
                                         <option value="객관식">객관식</option>
                                         <option value="주관식">주관식</option>
@@ -953,7 +1035,7 @@ function Admin() {
                                 </div>
 
                                 <div style={{ marginBottom: '30px' }}>
-                                    <h4>보기 사항</h4>
+                                    <h4>보기 사항 {problemData.type != "객관식" ? (<span className='fs-5 text-info'>(선택)</span>) : ''}</h4>
                                     {problemData.options.map((opt, idx) => {
                                         const circleNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
                                         return (
@@ -1008,6 +1090,83 @@ function Admin() {
                             </div>
                         )}
                     </>
+                )}
+                {active === '시험 관리' && (
+                    <div className="container">
+
+                        <h3 className="fw-bold mb-3">출제된 문제</h3>
+
+                        {examProblems.map((p, idx) => (
+                        <div key={p.problemId} className="border rounded p-3 mb-2">
+                            <div className="fw-bold">문제 {idx + 1}</div>
+                            <div className="mb-3">
+                                {renderProblemContent(p.content)}
+                            </div>
+
+                            {/* 이미지 표시 추가 */}
+                            {p.imageUrl && (
+                                <div className="mb-3">
+                                    <img 
+                                        src={p.imageUrl} 
+                                        alt={`문제 ${idx + 1} 이미지`}
+                                        style={{ 
+                                            maxWidth: '100%', 
+                                            height: 'auto',
+                                            borderRadius: '8px',
+                                            border: '1px solid #ddd'
+                                        }} 
+                                    />
+                                </div>
+                            )}
+
+                            <div className="mt-2">
+                            ⏱ 시간 : 
+                            <input
+                                type="number"
+                                min={10}
+                                value={p.timeLimit}
+                                className='ms-2'
+                                onChange={(e) => {
+                                const copy = [...examProblems];
+                                copy[idx].timeLimit = Number(e.target.value);
+                                setExamProblems(copy);
+                                }}
+                            /> 초
+                            </div>
+                        </div>
+                        ))}
+
+                        <hr />
+
+                        <h3 className="fw-bold mb-3">현재 접속 학생</h3>
+
+                        <table className="table">
+                            <thead>
+                                <tr>
+                                <th>학생 ID</th>
+                                <th>문제</th>
+                                <th>남은 시간</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {connectedStudents.map(s => (
+                                <tr key={s.studentId}>
+                                    <td>{s.studentId}</td>
+                                    <td>{s.solvingProblemId ?? '-'}</td>
+                                    <td>{s.remainingTime ? `${s.remainingTime}s` : '-'}</td>
+                                </tr>
+                                ))}
+                            </tbody>
+                        </table>
+
+                        <button
+                            className="btn btn-danger btn-lg w-100"
+                            onClick={startExam}
+                            disabled={examStarted || examProblems.length === 0}
+                        >
+                        시험 시작
+                        </button>
+                    </div>
                 )}
             </div>
         </div>

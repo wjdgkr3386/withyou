@@ -81,25 +81,21 @@ public class AccountService {
     // 회원가입
     // ===================
     public void signup(SignupDTO signupDTO) {
-        System.out.println(111);
         String verifiedKey = VERIFIED_PREFIX + signupDTO.getPhone();
         String isVerified = redisTemplate.opsForValue().get(verifiedKey);
 
-        System.out.println(222);
         if (isVerified == null) {
             throw new CustomException("전화번호 인증이 완료되지 않았거나 만료되었습니다.");
         }
 
-        System.out.println(333);
         if (userRepository.existsByUsername(signupDTO.getUsername())) {
             throw new CustomException("이미 사용 중인 아이디입니다.");
         }
-        System.out.println(444);
+
         if (userRepository.existsByPhone(signupDTO.getPhone())) {
             throw new CustomException("이미 등록된 전화번호입니다.");
         }
 
-        System.out.println(555);
         User user = new User(
                 signupDTO.getName(),
                 signupDTO.getUsername(),
@@ -111,15 +107,12 @@ public class AccountService {
                 signupDTO.getGrade(),
                 Role.USER
         );
-        System.out.println(666);
         try {
             userRepository.save(user);
         }catch(Exception e){
             System.out.println(e);
         }
-        System.out.println(777);
         redisTemplate.delete(verifiedKey);
-        System.out.println(888);
     }
 
     // ===================

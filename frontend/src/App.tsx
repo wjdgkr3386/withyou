@@ -26,12 +26,12 @@ function App() {
         <Route path="/signup"             element={<SignupPage />} />
         <Route path="/account/find"       element={<AccountFindPage />} />
         <Route path="/change-password"    element={<PasswordChangePage />} />
+        <Route path="/exam"               element={<ExamPage />} />
         
         {/* 네비바/푸터가 필요한 페이지들 */}
         <Route path="/"                   element={<> <Navbar/><MainPage /><Footer/>        </>} />
         <Route path="/about"              element={<> <Navbar/><AboutPage /><Footer/>       </>} />
         <Route path="/class"              element={<> <Navbar/><ClassPage /><Footer/>       </>} />
-        <Route path="/exam"               element={<> <Navbar/><ExamPage />                 </>} />
         <Route path="/notice"             element={<> <Navbar/><NoticePage /><Footer/>      </>} />
         <Route path="/notice/detail/:id"  element={<> <Navbar/><NoticeDetailPage/><Footer/> </>} />
         <Route path="/mypage"             element={<> <Navbar/><MyPage /><Footer/>          </>} />
