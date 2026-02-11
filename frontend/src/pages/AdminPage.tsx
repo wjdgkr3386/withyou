@@ -102,22 +102,20 @@ function Admin() {
         options: ['', '', '', ''], answer: ''
     });
     
-    interface ExamProblem {
-        problemId: number;
+    // 시험 문제 ID 배열
+    const [examProblemIds, setExamProblemIds] = useState<number[]>([]);
+    
+    // 시험 문제 상세 정보 저장
+    interface ExamProblemDetail {
+        id: number;
+        grade: string;
+        category: string;
         content: string;
-        timeLimit: number;
+        type: string;
+        difficulty: string;
         imageUrl?: string;
     }
-
-    interface ConnectedStudent {
-        studentId: string;
-        solvingProblemId?: number;
-        remainingTime?: number;
-    }
-
-    const [examProblems, setExamProblems] = useState<ExamProblem[]>([]);
-    const [connectedStudents, setConnectedStudents] = useState<ConnectedStudent[]>([]);
-    const [examStarted, setExamStarted] = useState(false);
+    const [examProblemsDetail, setExamProblemsDetail] = useState<Map<number, ExamProblemDetail>>(new Map());
     
     const [activeTab, setActiveTab] = useState<keyof typeof SYMBOL_GROUPS>('기본/연산');
     const [image, setImage] = useState<File | null>(null);
@@ -146,15 +144,7 @@ function Admin() {
             stompClient.current?.subscribe('/user/abc123/topic/private', (response) => {
                 console.log("나에게만 온 메시지: ", response.body);
             });
-
-            stompClient.current?.subscribe('/topic/student/status', (res) => {
-                    const status = JSON.parse(res.body);
-                    setConnectedStudents(prev => {
-                        const filtered = prev.filter(s => s.studentId !== status.studentId);
-                        return [...filtered, status];
-                    });
-                });
-            });
+        });
 
         return () => {
             if (stompClient.current) stompClient.current.disconnect(() => {});
@@ -357,20 +347,42 @@ function Admin() {
         }
     };
 
-    // ===== 시험 시작 =====
-    const startExam = () => {
-        if (!stompClient.current?.connected) {
-            alert("웹소켓이 연결되지 않았습니다.");
-            return;
+    // 시험 문제 추가
+    const addToExam = (problemId: number) => {
+        if (!examProblemIds.includes(problemId) && problem) {
+            setExamProblemIds([...examProblemIds, problemId]);
+            
+            // 문제 상세 정보 저장
+            const newDetail: ExamProblemDetail = {
+                id: problem.id,
+                grade: problem.grade,
+                category: problem.category,
+                content: problem.content,
+                type: problem.type,
+                difficulty: problem.difficulty,
+                imageUrl: problem.imageUrl
+            };
+            
+            setExamProblemsDetail(new Map(examProblemsDetail.set(problemId, newDetail)));
         }
+    };
 
-        stompClient.current.send(
-            "/app/exam/start",
-            {},
-            JSON.stringify({ problems: examProblems })
-        );
+    // 시험 문제 제거
+    const removeFromExam = (problemId: number) => {
+        setExamProblemIds(examProblemIds.filter(id => id !== problemId));
+        
+        // 상세 정보도 제거
+        const newDetail = new Map(examProblemsDetail);
+        newDetail.delete(problemId);
+        setExamProblemsDetail(newDetail);
+    };
 
-        setExamStarted(true);
+    // 시험 문제 순서 변경
+    const moveExamProblem = (fromIndex: number, toIndex: number) => {
+        const newIds = [...examProblemIds];
+        const [removed] = newIds.splice(fromIndex, 1);
+        newIds.splice(toIndex, 0, removed);
+        setExamProblemIds(newIds);
     };
 
     // 학년에 따른 카테고리 목록 가져오기
@@ -675,45 +687,41 @@ function Admin() {
                                         {!isEditing ? (
                                             <div id="problem-box" className="rounded p-4" style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}>
 
-                                                <div className="mb-3">
-                                                    <label>
-                                                        <input type="checkbox" onChange={(e) => {                                   
-                                                            if (e.target.checked && problem) {
-                                                                setExamProblems(prev => [
-                                                                    ...prev,
-                                                                    {
-                                                                    problemId: problem.id,
-                                                                    content: problem.content,
-                                                                    timeLimit: 60,
-                                                                    imageUrl: problem.imageUrl
-                                                                    }
-                                                                ]);
-                                                            } else {
-                                                                setExamProblems(prev =>
-                                                                    prev.filter(p => p.problemId !== problem?.id)
-                                                                );
-                                                            }
-                                                        }}
-                                                        /> 시험 문제로 선택
-                                                    </label>
-                                                </div>
-
-                                                <div className="mb-3">
-                                                    <span className="bg-primary-subtle text-primary fw-medium px-3 py-1 rounded-pill me-2">
-                                                        {GRADE_MAP[problem.grade] || problem.grade}
-                                                    </span>
-                                                    <span className="bg-success-subtle text-success fw-medium px-3 py-1 rounded-pill me-2">
-                                                        {problem.category}
-                                                    </span>
-                                                    <span className="bg-info-subtle text-info fw-medium px-3 py-1 rounded-pill me-2">
-                                                        {problem.type}
-                                                    </span>
-                                                    <span className={`fw-medium px-3 py-1 rounded-pill ${
-                                                        problem.difficulty === '상' ? 'bg-danger-subtle text-danger' : 
-                                                        problem.difficulty === '중' ? 'bg-warning-subtle text-warning' : 'bg-secondary-subtle text-secondary'
-                                                    }`}>
-                                                        난이도: {problem.difficulty}
-                                                    </span>
+                                                <div className="d-flex justify-content-between align-items-center mb-3">
+                                                    <div>
+                                                        <span className="bg-primary-subtle text-primary fw-medium px-3 py-1 rounded-pill me-2">
+                                                            {GRADE_MAP[problem.grade] || problem.grade}
+                                                        </span>
+                                                        <span className="bg-success-subtle text-success fw-medium px-3 py-1 rounded-pill me-2">
+                                                            {problem.category}
+                                                        </span>
+                                                        <span className="bg-info-subtle text-info fw-medium px-3 py-1 rounded-pill me-2">
+                                                            {problem.type}
+                                                        </span>
+                                                        <span className={`fw-medium px-3 py-1 rounded-pill ${
+                                                            problem.difficulty === '상' ? 'bg-danger-subtle text-danger' : 
+                                                            problem.difficulty === '중' ? 'bg-warning-subtle text-warning' : 'bg-secondary-subtle text-secondary'
+                                                        }`}>
+                                                            난이도: {problem.difficulty}
+                                                        </span>
+                                                    </div>
+                                                    <div>
+                                                        {examProblemIds.includes(problem.id) ? (
+                                                            <button 
+                                                                className="btn btn-outline-danger"
+                                                                onClick={() => removeFromExam(problem.id)}
+                                                            >
+                                                                시험 문제에서 빼기
+                                                            </button>
+                                                        ) : (
+                                                            <button 
+                                                                className="btn btn-outline-primary"
+                                                                onClick={() => addToExam(problem.id)}
+                                                            >
+                                                                시험 문제로 선택
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                                 <hr/>
 
@@ -1091,81 +1099,101 @@ function Admin() {
                         )}
                     </>
                 )}
+
                 {active === '시험 관리' && (
                     <div className="container">
-
-                        <h3 className="fw-bold mb-3">출제된 문제</h3>
-
-                        {examProblems.map((p, idx) => (
-                        <div key={p.problemId} className="border rounded p-3 mb-2">
-                            <div className="fw-bold">문제 {idx + 1}</div>
-                            <div className="mb-3">
-                                {renderProblemContent(p.content)}
+                        <div className="card shadow-sm">
+                            <div className="card-header bg-primary text-white">
+                                <h4 className="mb-0">시험 문제 목록 ({examProblemIds.length}개)</h4>
                             </div>
-
-                            {/* 이미지 표시 추가 */}
-                            {p.imageUrl && (
-                                <div className="mb-3">
-                                    <img 
-                                        src={p.imageUrl} 
-                                        alt={`문제 ${idx + 1} 이미지`}
-                                        style={{ 
-                                            maxWidth: '100%', 
-                                            height: 'auto',
-                                            borderRadius: '8px',
-                                            border: '1px solid #ddd'
-                                        }} 
-                                    />
-                                </div>
-                            )}
-
-                            <div className="mt-2">
-                            ⏱ 시간 : 
-                            <input
-                                type="number"
-                                min={10}
-                                value={p.timeLimit}
-                                className='ms-2'
-                                onChange={(e) => {
-                                const copy = [...examProblems];
-                                copy[idx].timeLimit = Number(e.target.value);
-                                setExamProblems(copy);
-                                }}
-                            /> 초
+                            <div className="card-body">
+                                {examProblemIds.length === 0 ? (
+                                    <div className="text-center py-5 text-muted">
+                                        선택된 시험 문제가 없습니다.<br />
+                                        문제은행에서 문제를 선택해주세요.
+                                    </div>
+                                ) : (
+                                    <div className="row g-3">
+                                        {examProblemIds.map((id, index) => {
+                                            const problemDetail = examProblemsDetail.get(id);
+                                            return (
+                                                <div key={id} className="col-12">
+                                                    <div className="card border">
+                                                        <div className="card-body">
+                                                            <div className="d-flex justify-content-between align-items-start mb-3">
+                                                                <div className="d-flex align-items-center gap-3">
+                                                                    <span className="badge bg-primary fs-4 px-3 py-2">{index + 1}</span>
+                                                                    <div>
+                                                                        <div className="mb-2">
+                                                                            <span className="badge bg-info me-2">{GRADE_MAP[problemDetail?.grade || ''] || problemDetail?.grade}</span>
+                                                                            <span className="badge bg-success me-2">{problemDetail?.category}</span>
+                                                                            <span className="badge bg-secondary me-2">{problemDetail?.type}</span>
+                                                                            <span className={`badge ${
+                                                                                problemDetail?.difficulty === '상' ? 'bg-danger' : 
+                                                                                problemDetail?.difficulty === '중' ? 'bg-warning' : 'bg-secondary'
+                                                                            }`}>
+                                                                                난이도: {problemDetail?.difficulty}
+                                                                            </span>
+                                                                        </div>
+                                                                        <div className="text-muted small">문제 ID: {id}</div>
+                                                                    </div>
+                                                                </div>
+                                                                <div className="btn-group">
+                                                                    <button 
+                                                                        className="btn btn-sm btn-outline-secondary"
+                                                                        onClick={() => moveExamProblem(index, index - 1)}
+                                                                        disabled={index === 0}
+                                                                        title="위로 이동"
+                                                                    >
+                                                                        ↑
+                                                                    </button>
+                                                                    <button 
+                                                                        className="btn btn-sm btn-outline-secondary"
+                                                                        onClick={() => moveExamProblem(index, index + 1)}
+                                                                        disabled={index === examProblemIds.length - 1}
+                                                                        title="아래로 이동"
+                                                                    >
+                                                                        ↓
+                                                                    </button>
+                                                                    <button 
+                                                                        className="btn btn-sm btn-outline-danger"
+                                                                        onClick={() => removeFromExam(id)}
+                                                                        title="제거"
+                                                                    >
+                                                                        ✕
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="border-top pt-3">
+                                                                <div className="fw-bold mb-2">문제 내용:</div>
+                                                                <div className="bg-light p-3 rounded" style={{ maxHeight: '200px', overflow: 'auto' }}>
+                                                                    {problemDetail ? renderProblemContent(problemDetail.content) : '문제 정보를 불러올 수 없습니다.'}
+                                                                </div>
+                                                                {problemDetail?.imageUrl && (
+                                                                    <div className="mt-3">
+                                                                        <img 
+                                                                            src={problemDetail.imageUrl} 
+                                                                            alt="문제 이미지" 
+                                                                            style={{ 
+                                                                                maxWidth: '200px', 
+                                                                                maxHeight: '150px',
+                                                                                borderRadius: '8px',
+                                                                                border: '1px solid #ddd'
+                                                                            }} 
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
                             </div>
                         </div>
-                        ))}
-
-                        <hr />
-
-                        <h3 className="fw-bold mb-3">현재 접속 학생</h3>
-
-                        <table className="table">
-                            <thead>
-                                <tr>
-                                <th>학생 ID</th>
-                                <th>문제</th>
-                                <th>남은 시간</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {connectedStudents.map(s => (
-                                <tr key={s.studentId}>
-                                    <td>{s.studentId}</td>
-                                    <td>{s.solvingProblemId ?? '-'}</td>
-                                    <td>{s.remainingTime ? `${s.remainingTime}s` : '-'}</td>
-                                </tr>
-                                ))}
-                            </tbody>
-                        </table>
-
-                        <button
-                            className="btn btn-danger btn-lg w-100"
-                            onClick={startExam}
-                            disabled={examStarted || examProblems.length === 0}
-                        >
-                        시험 시작
-                        </button>
                     </div>
                 )}
             </div>
