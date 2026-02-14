@@ -1,6 +1,7 @@
 package com.withyou.backend.common.s3;
 
 import java.io.IOException;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -8,6 +9,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.CopyObjectRequest;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Service
@@ -37,6 +39,27 @@ public class S3UploadService {
         );
 
         return "https://" + bucket + ".s3.amazonaws.com/" + key;
+    }
+
+    public String copyImage(String sourceUrl, String destPath) {
+        if (sourceUrl == null || sourceUrl.isEmpty()) {
+            return null;
+        }
+
+        String sourceKey = sourceUrl.substring(sourceUrl.indexOf("images/"));
+        String fileName = sourceKey.substring(sourceKey.lastIndexOf("/") + 1);
+        String destinationKey = destPath + "/" + fileName;
+
+        CopyObjectRequest copyReq = CopyObjectRequest.builder()
+                .sourceBucket(bucket)
+                .sourceKey(sourceKey)
+                .destinationBucket(bucket)
+                .destinationKey(destinationKey)
+                .build();
+
+        s3Client.copyObject(copyReq);
+
+        return "https://" + bucket + ".s3.amazonaws.com/" + destinationKey;
     }
 
     public void delete(String key) {

@@ -9,4 +9,4 @@ export const GRADE_OPTIONS = [
     { label: "고3", value: "H3" }
 ];
 export const DIFFICULTY_OPTIONS = ["하", "중", "상"];
-export const TYPE_OPTIONS = ["객관식", "주관식", "빈칸채우기"];
+export const TYPE_OPTIONS = ["객관식", "주관식"];
