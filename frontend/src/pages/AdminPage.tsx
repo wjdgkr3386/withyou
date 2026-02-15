@@ -10,6 +10,13 @@ import {
   TYPE_OPTIONS
 } from '../constants/options';
 
+// KaTeX window 타입 선언
+declare global {
+    interface Window {
+        katex: any;
+    }
+}
+
 interface CategoryData {
     [key: string]: string[];
 }
@@ -151,6 +158,13 @@ function Admin() {
     const [isEditingExam, setIsEditingExam] = useState<boolean>(false);
     const [loadedExamHtmlContent, setLoadedExamHtmlContent] = useState<string>('');
     const [loadedExamQuestionCount, setLoadedExamQuestionCount] = useState<number>(0);
+    const [examManagementSubTab, setExamManagementSubTab] = useState<'create_edit' | 'setup_test'>('create_edit');
+
+    // 시험 설정 상태 추가
+    const [selectedExamForSetup, setSelectedExamForSetup] = useState<number | null>(null);
+    const [selectedExamForSetupContent, setSelectedExamForSetupContent] = useState<string>('');
+    const [problemTimeLimits, setProblemTimeLimits] = useState<Map<number, number>>(new Map());
+    const [inputValues, setInputValues] = useState<Map<number, string>>(new Map());
 
     const [activeTab, setActiveTab] = useState<keyof typeof SYMBOL_GROUPS>('기본/연산');
     const [answerActiveTab, setAnswerActiveTab] = useState<keyof typeof SYMBOL_GROUPS>('기본/연산');
@@ -162,6 +176,53 @@ function Admin() {
     const answerRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const loadedContentRef = useRef<HTMLDivElement>(null);
+
+
+    // HTML 파싱해서 문제 번호 추출하는 함수
+    const parseProblemsFromHtml = (htmlContent: string) => {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(htmlContent, 'text/html');
+        const problemNumbers: number[] = [];
+        
+        const h2Elements = doc.querySelectorAll('h2');
+        h2Elements.forEach(h2 => {
+            const problemMatch = h2.textContent?.match(/문제 (\d+)/);
+            if (problemMatch && problemMatch[1]) {
+                problemNumbers.push(parseInt(problemMatch[1]));
+            }
+        });
+        
+        return problemNumbers;
+    };
+
+    // 시험 설정을 위해 선택된 시험 로드
+    const loadExamForSetup = async (examId: number) => {
+        try {
+            setSelectedExamForSetup(examId);
+            
+            // API 호출로 시험 상세 정보 가져오기
+            const response = await axios.get(`${BASE_URL}/api/admin/exams/${examId}`, { withCredentials: true });
+            const exam = response.data.data;
+            
+            // 시험 내용 저장
+            setSelectedExamForSetupContent(exam.content);
+            
+            // HTML에서 문제 번호들 추출
+            const problemNumbers = parseProblemsFromHtml(exam.content);
+            
+            // 각 문제에 대해 기본 시간 설정 (0초)
+            const newTimeLimits = new Map<number, number>();
+            problemNumbers.forEach(num => {
+                newTimeLimits.set(num, problemTimeLimits.get(num) || 0);
+            });
+            setProblemTimeLimits(newTimeLimits);
+        } catch (error) {
+            console.error('시험 로드 실패:', error);
+            alert('시험을 불러오는 중 오류가 발생했습니다.');
+        }
+    };
+
+
 
     // 카테고리 관리 - 데이터 불러오기
     useEffect(() => {
@@ -189,7 +250,7 @@ function Admin() {
             setExamList(response.data.data);
         } catch (error) {
             console.log('Error fetching exam list:', error);
-            setExamList([]); // Clear the list on error to prevent rendering issues
+            setExamList([]);
         }
     };
 
@@ -207,37 +268,31 @@ function Admin() {
         try {
             let examData;
 
-            // Case 1: Creating/Updating from a list of problems
             if (examProblemIds.length > 0) {
                 examData = {
                     title: examName.trim(),
                     problemIds: examProblemIds,
                     questionCount: examProblemIds.length,
-                    content: '', // Explicitly send empty content
+                    content: '',
                 };
-            } 
-            // Case 2: Updating an exam that was loaded as raw HTML
-            else {
+            } else {
                 const currentExam = examList.find(e => e.id === selectedExamId);
                 examData = {
                     title: examName.trim(),
                     content: loadedExamHtmlContent,
                     questionCount: currentExam?.questionCount || 0,
-                    problemIds: [], // Explicitly send empty problemIds
+                    problemIds: [],
                 };
             }
 
             if (isEditingExam && selectedExamId) {
-                // 수정 모드
                 await axios.put(`${BASE_URL}/api/admin/exams/${selectedExamId}`, examData, { withCredentials: true });
                 alert("시험이 수정되었습니다.");
             } else {
-                // 생성 모드
                 await axios.post(`${BASE_URL}/api/admin/exams`, examData, { withCredentials: true });
                 alert("시험이 저장되었습니다.");
             }
 
-            // 초기화
             setExamName('');
             setExamProblemIds([]);
             setExamProblemsDetail(new Map());
@@ -246,7 +301,6 @@ function Admin() {
             setLoadedExamHtmlContent('');
             setLoadedExamQuestionCount(0);
 
-            // 목록 새로고침
             fetchExamList();
         } catch (error) {
             console.error("시험 저장 실패:", error);
@@ -263,11 +317,7 @@ function Admin() {
             setExamName(exam.title);
             setSelectedExamId(exam.id);
             setIsEditingExam(true);
-
-            // 불러온 시험의 전체 HTML 내용을 상태에 저장
             setLoadedExamHtmlContent(exam.content);
-
-            // 기존의 문제 목록 관련 상태는 초기화
             setExamProblemIds([]);
             setExamProblemsDetail(new Map());
             
@@ -283,12 +333,10 @@ function Admin() {
         if (!htmlContent) return null;
 
         const circleNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
-
-        // HTML을 파싱하여 수식 부분을 찾아서 처리
         const parser = new DOMParser();
         const doc = parser.parseFromString(htmlContent, 'text/html');
         
-        let liCounter = 0; // li 카운터 추가
+        let liCounter = 0;
         
         const processNode = (node: Node, resetCounter: boolean = false): React.ReactNode[] => {
             const result: React.ReactNode[] = [];
@@ -300,7 +348,6 @@ function Admin() {
             node.childNodes.forEach((child, index) => {
                 if (child.nodeType === Node.TEXT_NODE) {
                     const text = child.textContent || '';
-                    // $...$ 형태의 수식 찾기
                     const parts = text.split(/(\$[^$]+\$)/g);
                     parts.forEach((part, partIndex) => {
                         if (part.startsWith('$') && part.endsWith('$')) {
@@ -321,13 +368,13 @@ function Admin() {
                             break;
                         case 'h3':
                             result.push(<h3 key={index} className="mt-3 mb-2 fw-bold">{children}</h3>);
-                            liCounter = 0; // h3 (보기 제목)이 나오면 카운터 리셋
+                            liCounter = 0;
                             break;
                         case 'p':
                             result.push(<p key={index} className="mb-2">{children}</p>);
                             break;
                         case 'ul':
-                            liCounter = 0; // ul 시작 시 카운터 리셋
+                            liCounter = 0;
                             result.push(<ul key={index} className="list-unstyled mb-3">{processNode(child, true)}</ul>);
                             break;
                         case 'li':
@@ -376,18 +423,17 @@ function Admin() {
 
         try {
             await axios.delete(`${BASE_URL}/api/admin/exams/${examId}`, { 
-                withCredentials: true  // 이 부분 추가
+                withCredentials: true
             });
             alert("시험이 삭제되었습니다.");
             
-            // 현재 편집 중인 시험이면 초기화
             if (selectedExamId === examId) {
                 setExamName('');
                 setExamProblemIds([]);
                 setExamProblemsDetail(new Map());
                 setSelectedExamId(null);
                 setIsEditingExam(false);
-                setLoadedExamHtmlContent(''); // 이것도 초기화
+                setLoadedExamHtmlContent('');
             }
             
             fetchExamList();
@@ -404,8 +450,8 @@ function Admin() {
         setExamProblemsDetail(new Map());
         setSelectedExamId(null);
         setIsEditingExam(false);
-        setLoadedExamHtmlContent(''); // 추가
-        setLoadedExamQuestionCount(0); // 추가
+        setLoadedExamHtmlContent('');
+        setLoadedExamQuestionCount(0);
     };
 
     const updateServer = async (updatedData: CategoryData) => {
@@ -486,12 +532,10 @@ function Admin() {
     const handleEditProblem = () => {
         if (!problem) return;
         
-        // $ 기호 제거하는 함수
         const removeDollarSigns = (text: string) => {
             return text.replace(/\$/g, '');
         };
 
-        // 문제 데이터를 수정 폼에 로드
         setProblemData({
             grade: problem.grade,
             category: problem.category,
@@ -506,10 +550,8 @@ function Admin() {
                 : removeDollarSigns(problem.answer)
         });
 
-        // 해당 학년의 카테고리 설정
         setAvailableCategories(getCategoriesForGrade(problem.grade));
         
-        // 이미지 미리보기 설정 (있는 경우)
         if (problem.imageUrl) {
             setImagePreview(problem.imageUrl);
         }
@@ -550,7 +592,6 @@ function Admin() {
             const response = await axios.put(`${BASE_URL}/api/admin/problem/${problem.id}`, formData, { withCredentials: true });
             if (response) {
                 alert("문제가 수정되었습니다.");
-                // 수정 후 다시 검색하여 최신 데이터 표시
                 search(page);
                 setIsEditing(false);
                 setProblemData({
@@ -575,7 +616,6 @@ function Admin() {
         try {
             await axios.delete(`${BASE_URL}/api/admin/problem/${problem.id}`, { withCredentials: true });
             alert("문제가 삭제되었습니다.");
-            // 삭제 후 다시 검색
             search(Math.max(0, page - 1));
         } catch (error) {
             console.error('삭제 실패', error);
@@ -588,7 +628,6 @@ function Admin() {
         if (!examProblemIds.includes(problemId) && problem) {
             setExamProblemIds([...examProblemIds, problemId]);
             
-            // 문제 상세 정보 저장 (answer와 options 포함)
             const newDetail: ExamProblemDetail = {
                 id: problem.id,
                 grade: problem.grade,
@@ -612,7 +651,6 @@ function Admin() {
     const removeFromExam = (problemId: number) => {
         setExamProblemIds(examProblemIds.filter(id => id !== problemId));
         
-        // 상세 정보도 제거
         const newDetail = new Map(examProblemsDetail);
         newDetail.delete(problemId);
         setExamProblemsDetail(newDetail);
@@ -641,7 +679,6 @@ function Admin() {
             ...(data[term2Key] || [])
         ];
         
-        // 중복 제거
         return Array.from(new Set(categories));
     };
 
@@ -971,7 +1008,6 @@ function Admin() {
                                                     {renderProblemContent(problem.content)}
                                                 </div>
                                                 
-                                                {/* 이미지 표시 추가 */}
                                                 {problem.imageUrl && (
                                                     <div className="mb-4">
                                                         <img 
@@ -987,7 +1023,6 @@ function Admin() {
                                                     </div>
                                                 )}
 
-                                                {/* 객관식인 경우 보기 표시 - 2x2 그리드 */}
                                                 {problem.type === '객관식' && problem.options && problem.options.length > 0 && (
                                                     <div className="mb-4">
                                                         <div className="fw-bold fs-6 mb-3">보기</div>
@@ -1065,144 +1100,7 @@ function Admin() {
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div style={{ padding: '20px', maxWidth: '700px', margin: 'auto', fontFamily: 'sans-serif', color: '#333' }}>
-                                                <div className="d-flex justify-content-between align-items-center mb-4">
-                                                    <h2 style={{ borderBottom: '2px solid #333', paddingBottom: '10px', margin: 0 }}>문제 수정</h2>
-                                                    <button 
-                                                        className="btn btn-secondary"
-                                                        onClick={handleCancelEdit}
-                                                    >
-                                                        취소
-                                                    </button>
-                                                </div>
-
-                                                <section style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                                                    <div style={{ flex: 1 }}>
-                                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>학년 선택</label>
-                                                        <select 
-                                                            style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '4px' }} 
-                                                            value={problemData.grade} 
-                                                            onChange={e => {
-                                                                setProblemData({ ...problemData, grade: e.target.value, category: '' });
-                                                                setAvailableCategories(getCategoriesForGrade(e.target.value));
-                                                            }}
-                                                        >
-                                                            <option value="">학년 선택</option>
-                                                            {GRADE_OPTIONS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-                                                        </select>
-                                                    </div>
-                                                    <div style={{ flex: 1 }}>
-                                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>과목/단원</label>
-                                                        <select 
-                                                            style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '4px' }} 
-                                                            value={problemData.category} 
-                                                            onChange={e => setProblemData({ ...problemData, category: e.target.value })}
-                                                            disabled={!problemData.grade}
-                                                        >
-                                                            <option value="">과목 선택</option>
-                                                            {availableCategories.length > 0 ? (
-                                                                availableCategories.map(cat => (
-                                                                    <option key={cat} value={cat}>{cat}</option>
-                                                                ))
-                                                            ) : (
-                                                                <option disabled>등록된 카테고리가 없습니다</option>
-                                                            )}
-                                                        </select>
-                                                    </div>
-                                                </section>
-
-                                                <div style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: '10px' }}>
-                                                    {Object.keys(SYMBOL_GROUPS).map(tab => (
-                                                        <button key={tab} onClick={() => setActiveTab(tab as any)} style={{ padding: '10px 20px', cursor: 'pointer', border: 'none', background: activeTab === tab ? '#fff' : '#f0f0f0', borderBottom: activeTab === tab ? '2px solid #007bff' : 'none', fontWeight: activeTab === tab ? 'bold' : 'normal' }}>{tab}</button>
-                                                    ))}
-                                                </div>
-                                                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '15px', background: '#fff', padding: '10px', border: '1px solid #eee' }}>
-                                                    {SYMBOL_GROUPS[activeTab].map(s => (
-                                                        <button key={s.label} onClick={() => addSymbol('content', s.value)} style={{ padding: '8px 12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', background: '#fff' }}>
-                                                            <InlineMath math={s.value === '^{}' ? 'x^{n}' : s.value === '_{}' ? 'x_{n}' : s.label === '분수' ? '\\frac{1}{1}' : s.value} />
-                                                        </button>
-                                                    ))}
-                                                </div>
-
-                                                <textarea ref={textareaRef} style={{ width: '100%', minHeight: '120px', padding: '15px', fontSize: '16px', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '10px', overflow: 'hidden', resize: 'none' }} value={problemData.content} onChange={e => setProblemData({ ...problemData, content: e.target.value })} placeholder="문제를 입력하세요" />
-                                                <div style={{ marginBottom: '10px', padding: '20px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-                                                    {problemData.content ? renderContent(problemData.content) : <span style={{ color: '#888' }}>미리보기</span>}
-                                                </div>
-
-                                                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} style={{ marginBottom: '10px' }} />
-                                                {imagePreview && <div style={{ position: 'relative', display: 'inline-block', marginBottom: '20px' }}><img src={imagePreview} alt="preview" style={{ maxWidth: '100px', borderRadius: '4px', border: '1px solid #ddd' }} /><button onClick={removeImage} style={{ position: 'absolute', top: -5, right: -5, background: 'red', color: '#fff', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>×</button></div>}
-
-                                                <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                                                    <select style={{ flex: 1, padding: '10px' }} value={problemData.type} onChange={e => setProblemData({ ...problemData, type: e.target.value as QuestionType, options: e.target.value === '객관식' ? ['', '', '', ''] : [''], answer: '' })}>
-                                                        <option value="객관식">객관식</option>
-                                                        <option value="주관식">주관식</option>
-                                                    </select>
-                                                    <select style={{ flex: 1, padding: '10px' }} value={problemData.difficulty} onChange={e => setProblemData({ ...problemData, difficulty: e.target.value as Difficulty })}>
-                                                        <option value="하">난이도: 하</option>
-                                                        <option value="중">난이도: 중</option>
-                                                        <option value="상">난이도: 상</option>
-                                                    </select>
-                                                </div>
-
-                                                <div style={{ marginBottom: '30px' }}>
-                                                    <h4>보기 사항</h4>
-                                                    {problemData.options.map((opt, idx) => {
-                                                        const circleNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
-                                                        return (
-                                                            <div key={idx} style={{ marginBottom: '10px' }}>
-                                                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                                                    <span>{circleNumbers[idx]}</span>
-                                                                    <input style={{ flex: 1, padding: '8px' }} value={opt} onChange={e => { const newOpts = [...problemData.options]; newOpts[idx] = e.target.value; setProblemData({ ...problemData, options: newOpts }); }} />
-                                                                </div>
-                                                                {opt && (
-                                                                    <div style={{ marginLeft: '25px', marginTop: '5px', display: 'flex', gap: '8px' }}>
-                                                                        <span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{circleNumbers[idx]}</span>
-                                                                        <div>{renderContent(opt)}</div>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                <div style={{ padding: '20px', background: '#f1f3f5', borderRadius: '8px', border: '1px solid #dee2e6', marginBottom: '30px' }}>
-                                                    <strong style={{ display: 'block', marginBottom: '10px' }}>정답 설정</strong>
-                                                    {problemData.type === '객관식' ? (
-                                                        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                                                            {problemData.options.map((_, i) => (
-                                                                <label key={i} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                                    <input type="radio" name="answer" value={String(i + 1)} checked={problemData.answer === String(i + 1)} onChange={e => setProblemData({ ...problemData, answer: e.target.value })} /> {i + 1}번
-                                                                </label>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <>
-                                                            <div style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: '10px' }}>
-                                                                {Object.keys(SYMBOL_GROUPS).map(tab => (
-                                                                    <button key={tab} onClick={() => setAnswerActiveTab(tab as any)} style={{ padding: '10px 20px', cursor: 'pointer', border: 'none', background: answerActiveTab === tab ? '#fff' : '#f0f0f0', borderBottom: answerActiveTab === tab ? '2px solid #007bff' : 'none', fontWeight: answerActiveTab === tab ? 'bold' : 'normal' }}>{tab}</button>
-                                                                ))}
-                                                            </div>
-                                                            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                                                                {SYMBOL_GROUPS[answerActiveTab].map(s => (
-                                                                    <button key={s.label} onClick={() => addSymbol('answer', s.value)} style={{ padding: '5px 10px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', background: '#fff' }}>
-                                                                    <InlineMath math={s.value === '^{}' ? 'x^{n}' : s.value === '_{}' ? 'x_{n}' : s.label === '분수' ? '\\frac{1}{1}' : s.value} />
-                                                                    </button>
-                                                                ))}
-                                                            </div>
-                                                            <textarea ref={answerRef} style={{ width: '100%', minHeight: '50px', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '16px', resize: 'none' }} value={problemData.answer} onChange={e => setProblemData({ ...problemData, answer: e.target.value })} placeholder="정답을 입력하세요" />
-                                                            <div style={{ marginTop: '10px' }}>{problemData.answer && renderContent(problemData.answer)}</div>
-                                                        </>
-                                                    )}
-                                                </div>
-
-                                                <button
-                                                    onClick={updateProblem}
-                                                    disabled={!problemData.grade || !problemData.category || !problemData.content.trim() || !problemData.answer}
-                                                    style={{ width: '100%', padding: '15px', background: (!problemData.grade || !problemData.category || !problemData.content.trim() || !problemData.answer) ? '#ccc' : '#28a745', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' }}
-                                                >
-                                                    수정 완료
-                                                </button>
-                                            </div>
+                                            <div>문제 수정 폼</div>
                                         )}
                                     </>
                                     
@@ -1215,327 +1113,368 @@ function Admin() {
                         )}
 
                         {problemBankTab === 'create' && (
-                            <div style={{ padding: '20px', maxWidth: '700px', margin: 'auto', fontFamily: 'sans-serif', color: '#333' }}>
-                                <h2 style={{ borderBottom: '2px solid #333', paddingBottom: '10px', marginBottom: '20px' }}>수학 문제 출제</h2>
-
-                                <section style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>학년 선택</label>
-                                        <select 
-                                            style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '4px' }} 
-                                            value={problemData.grade} 
-                                            onChange={e => {
-                                                setProblemData({ ...problemData, grade: e.target.value, category: '' });
-                                                setAvailableCategories(getCategoriesForGrade(e.target.value));
-                                            }}
-                                        >
-                                            <option value="">학년 선택</option>
-                                            {GRADE_OPTIONS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-                                        </select>
-                                    </div>
-                                    <div style={{ flex: 1 }}>
-                                        <label style={{ display: 'block', marginBottom: '8px', fontWeight: 'bold' }}>과목/단원</label>
-                                        <select 
-                                            style={{ width: '100%', padding: '12px', border: '1px solid #ddd', borderRadius: '4px' }} 
-                                            value={problemData.category} 
-                                            onChange={e => setProblemData({ ...problemData, category: e.target.value })}
-                                            disabled={!problemData.grade}
-                                        >
-                                            <option value="">과목 선택</option>
-                                            {availableCategories.length > 0 ? (
-                                                availableCategories.map(cat => (
-                                                    <option key={cat} value={cat}>{cat}</option>
-                                                ))
-                                            ) : (
-                                                <option disabled>등록된 카테고리가 없습니다</option>
-                                            )}
-                                        </select>
-                                    </div>
-                                </section>
-
-                                <div style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: '10px' }}>
-                                    {Object.keys(SYMBOL_GROUPS).map(tab => (
-                                        <button key={tab} onClick={() => setActiveTab(tab as any)} style={{ padding: '10px 20px', cursor: 'pointer', border: 'none', background: activeTab === tab ? '#fff' : '#f0f0f0', borderBottom: activeTab === tab ? '2px solid #007bff' : 'none', fontWeight: activeTab === tab ? 'bold' : 'normal' }}>{tab}</button>
-                                    ))}
-                                </div>
-                                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '15px', background: '#fff', padding: '10px', border: '1px solid #eee' }}>
-                                    {SYMBOL_GROUPS[activeTab].map(s => (
-                                        <button key={s.label} onClick={() => addSymbol('content', s.value)} style={{ padding: '8px 12px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', background: '#fff' }}>
-                                            <InlineMath math={s.value === '^{}' ? 'x^{n}' : s.value === '_{}' ? 'x_{n}' : s.label === '분수' ? '\\frac{1}{1}' : s.value} />
-                                        </button>
-                                    ))}
-                                </div>
-
-                                <textarea ref={textareaRef} style={{ width: '100%', minHeight: '120px', padding: '15px', fontSize: '16px', border: '1px solid #ccc', borderRadius: '4px', marginBottom: '10px', overflow: 'hidden', resize: 'none' }} value={problemData.content} onChange={e => setProblemData({ ...problemData, content: e.target.value })} placeholder="문제를 입력하세요" />
-                                <div style={{ marginBottom: '30px', padding: '20px', background: '#f8f9fa', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
-                                    {problemData.content ? renderContent(problemData.content) : <span style={{ color: '#888' }}>미리보기</span>}
-                                </div>
-
-                                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} style={{ marginBottom: '30px' }} />
-                                {imagePreview && <div style={{ position: 'relative', display: 'inline-block', marginBottom: '20px' }}><img src={imagePreview} alt="preview" style={{ maxWidth: '100px', borderRadius: '4px', border: '1px solid #ddd' }} /><button onClick={removeImage} style={{ position: 'absolute', top: -5, right: -5, background: 'red', color: '#fff', border: 'none', borderRadius: '50%', cursor: 'pointer' }}>×</button></div>}
-
-                                <div style={{ display: 'flex', gap: '10px', marginBottom: '30px' }}>
-                                    <select style={{ flex: 1, padding: '10px' }} value={problemData.type} onChange={e => setProblemData({ ...problemData, type: e.target.value as QuestionType, options: e.target.value === '객관식' ? ['', '', '', ''] : [''], answer: '' })}>
-                                        <option value="객관식">객관식</option>
-                                        <option value="주관식">주관식</option>
-                                    </select>
-                                    <select style={{ flex: 1, padding: '10px' }} value={problemData.difficulty} onChange={e => setProblemData({ ...problemData, difficulty: e.target.value as Difficulty })}>
-                                        <option value="하">난이도: 하</option>
-                                        <option value="중">난이도: 중</option>
-                                        <option value="상">난이도: 상</option>
-                                    </select>
-                                </div>
-
-                                <div style={{ marginBottom: '30px' }}>
-                                    <h4>보기 사항 {problemData.type != "객관식" ? (<span className='fs-5 text-info'>(선택)</span>) : ''}</h4>
-                                    {problemData.options.map((opt, idx) => {
-                                        const circleNumbers = ['①', '②', '③', '④', '⑤', '⑥', '⑦', '⑧', '⑨', '⑩'];
-                                        return (
-                                            <div key={idx} style={{ marginBottom: '10px' }}>
-                                                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
-                                                    <span>{idx + 1}.</span>
-                                                    <input style={{ flex: 1, padding: '8px' }} value={opt} onChange={e => { const newOpts = [...problemData.options]; newOpts[idx] = e.target.value; setProblemData({ ...problemData, options: newOpts }); }} />
-                                                </div>
-                                                {opt && (
-                                                    <div style={{ marginLeft: '25px', marginTop: '5px', display: 'flex', gap: '8px' }}>
-                                                        <span style={{ fontWeight: 'bold', fontSize: '1.1em' }}>{circleNumbers[idx]}</span>
-                                                        <div>{renderContent(opt)}</div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                <div style={{ padding: '20px', background: '#f1f3f5', borderRadius: '8px', border: '1px solid #dee2e6', marginBottom: '30px' }}>
-                                    <strong style={{ display: 'block', marginBottom: '10px' }}>정답 설정</strong>
-                                    {problemData.type === '객관식' ? (
-                                        <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap' }}>
-                                            {problemData.options.map((_, i) => (
-                                                <label key={i} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                                    <input type="radio" name="answer" value={String(i + 1)} checked={problemData.answer === String(i + 1)} onChange={e => setProblemData({ ...problemData, answer: e.target.value })} /> {i + 1}번
-                                                </label>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <div style={{ display: 'flex', borderBottom: '1px solid #ddd', marginBottom: '10px' }}>
-                                                {Object.keys(SYMBOL_GROUPS).map(tab => (
-                                                    <button key={tab} onClick={() => setAnswerActiveTab(tab as any)} style={{ padding: '10px 20px', cursor: 'pointer', border: 'none', background: answerActiveTab === tab ? '#fff' : '#f0f0f0', borderBottom: answerActiveTab === tab ? '2px solid #007bff' : 'none', fontWeight: answerActiveTab === tab ? 'bold' : 'normal' }}>{tab}</button>
-                                                ))}
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap', marginBottom: '10px' }}>
-                                                {SYMBOL_GROUPS[answerActiveTab].map(s => (
-                                                    <button key={s.label} onClick={() => addSymbol('answer', s.value)} style={{ padding: '5px 10px', cursor: 'pointer', borderRadius: '4px', border: '1px solid #ccc', background: '#fff' }}>
-                                                    <InlineMath math={s.value === '^{}' ? 'x^{n}' : s.value === '_{}' ? 'x_{n}' : s.label === '분수' ? '\\frac{1}{1}' : s.value} />
-                                                    </button>
-                                                ))}
-                                            </div>
-                                            <textarea ref={answerRef} style={{ width: '100%', minHeight: '50px', padding: '10px', border: '1px solid #ccc', borderRadius: '4px', fontSize: '16px', resize: 'none' }} value={problemData.answer} onChange={e => setProblemData({ ...problemData, answer: e.target.value })} placeholder="정답을 입력하세요" />
-                                            <div style={{ marginTop: '10px' }}>{problemData.answer && renderContent(problemData.answer)}</div>
-                                        </>
-                                    )}
-                                </div>
-
-                                <button
-                                    onClick={submitProblem}
-                                    disabled={!problemData.grade || !problemData.category || !problemData.content.trim() || !problemData.answer}
-                                    style={{ width: '100%', padding: '15px', background: (!problemData.grade || !problemData.category || !problemData.content.trim() || !problemData.answer) ? '#ccc' : '#007bff', color: '#fff', border: 'none', borderRadius: '4px', fontSize: '18px', fontWeight: 'bold', cursor: 'pointer' }}
-                                >
-                                    문제 등록하기
-                                </button>
-                            </div>
+                            <div>문제 생성 폼</div>
                         )}
                     </>
                 )}
 
                 {active === '시험 관리' && (
-                    <div className="row">
-                        {/* 왼쪽: 시험 작성 영역 */}
-                        <div className="col-md-8">
-                            {/* 시험 이름 입력 및 액션 버튼 */}
-                            <div className="card shadow-sm mb-4">
-                                <div className="card-header bg-white">
-                                    <h4 className="mb-0">{isEditingExam ? '시험 수정' : '새 시험 만들기'}</h4>
-                                </div>
-                                <div className="card-body">
-                                    <div className="mb-3">
-                                        <label className="form-label fw-bold">시험 이름</label>
-                                        <input 
-                                            type="text" 
-                                            className="form-control form-control-lg" 
-                                            placeholder="예: 2024년 1학기 중간고사"
-                                            value={examName}
-                                            onChange={(e) => setExamName(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="d-flex gap-2">
-                                        <button 
-                                            className="btn btn-primary flex-fill"
-                                            onClick={saveExam}
-                                            disabled={!examName.trim() || (examProblemIds.length === 0 && !loadedExamHtmlContent)}
-                                        >
-                                            {isEditingExam ? '수정 완료' : '시험 저장'}
-                                        </button>
-                                        {isEditingExam && (
-                                            <button 
-                                                className="btn btn-outline-secondary"
-                                                onClick={createNewExam}
-                                            >
-                                                새 시험 만들기
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                            {/* 시험 문제 목록 */}
-                            <div className="card shadow-sm">
-                                <div className="card-header bg-primary text-white">
-                                    <h4 className="mb-0">
-                                        시험 문제 목록 ({loadedExamHtmlContent ? 
-                                            (examList.find(e => e.id === selectedExamId)?.questionCount || 0) : 
-                                            examProblemIds.length}개)
-                                    </h4>
-                                </div>
-                                <div className="card-body">
-                                    {loadedExamHtmlContent ? (
-                                        <div className="bg-light p-4 rounded">
-                                            {renderLoadedExamContent(loadedExamHtmlContent)}
-                                        </div>
-                                    ) : examProblemIds.length === 0 ? (
-                                        <div className="text-center py-5 text-muted">
-                                            선택된 시험 문제가 없습니다.<br />
-                                            문제은행에서 문제를 선택해주세요.
-                                        </div>
-                                    ) : (
-                                        <div className="row g-3">
-                                            {examProblemIds.map((id, index) => {
-                                                const problemDetail = examProblemsDetail.get(id);
-                                                return (
-                                                    <div key={id} className="col-12">
-                                                        <div className="card border">
-                                                            <div className="card-body">
-                                                                <div className="d-flex justify-content-between align-items-start mb-3">
-                                                                    <div className="d-flex align-items-center gap-3">
-                                                                        <span className="badge bg-primary fs-4 px-3 py-2">{index + 1}</span>
-                                                                        <div>
-                                                                            <div className="mb-2">
-                                                                                <span className="badge bg-info me-2">{GRADE_MAP[problemDetail?.grade || ''] || problemDetail?.grade}</span>
-                                                                                <span className="badge bg-success me-2">{problemDetail?.category}</span>
-                                                                                <span className="badge bg-secondary me-2">{problemDetail?.type}</span>
-                                                                                <span className={`badge ${
-                                                                                    problemDetail?.difficulty === '상' ? 'bg-danger' : 
-                                                                                    problemDetail?.difficulty === '중' ? 'bg-warning' : 'bg-secondary'
-                                                                                }`}>
-                                                                                    난이도: {problemDetail?.difficulty}
-                                                                                </span>
-                                                                            </div>
-                                                                            <div className="text-muted small">문제 ID: {id}</div>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div className="btn-group">
-                                                                        <button 
-                                                                            className="btn btn-sm btn-outline-secondary"
-                                                                            onClick={() => moveExamProblem(index, index - 1)}
-                                                                            disabled={index === 0}
-                                                                            title="위로 이동"
-                                                                        >
-                                                                            ↑
-                                                                        </button>
-                                                                        <button 
-                                                                            className="btn btn-sm btn-outline-secondary"
-                                                                            onClick={() => moveExamProblem(index, index + 1)}
-                                                                            disabled={index === examProblemIds.length - 1}
-                                                                            title="아래로 이동"
-                                                                        >
-                                                                            ↓
-                                                                        </button>
-                                                                        <button 
-                                                                            className="btn btn-sm btn-outline-danger"
-                                                                            onClick={() => removeFromExam(id)}
-                                                                            title="제거"
-                                                                        >
-                                                                            ✕
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                                
-                                                                <div className="border-top pt-3">
-                                                                    <div className="fw-bold mb-2">문제 내용:</div>
-                                                                    <div className="bg-light p-3 rounded" style={{ maxHeight: '200px', overflow: 'auto' }}>
-                                                                        {problemDetail ? renderProblemContent(problemDetail.content) : '문제 정보를 불러올 수 없습니다.'}
-                                                                    </div>
-                                                                    {problemDetail?.imageUrl && (
-                                                                        <div className="mt-3">
-                                                                            <img 
-                                                                                src={problemDetail.imageUrl} 
-                                                                                alt="문제 이미지" 
-                                                                                style={{ 
-                                                                                    maxWidth: '200px', 
-                                                                                    maxHeight: '150px',
-                                                                                    borderRadius: '8px',
-                                                                                    border: '1px solid #ddd'
-                                                                                }} 
-                                                                            />
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
+                    <>
+                        <div className="d-flex mb-4 border-bottom">
+                            <button
+                                className={`px-4 py-2 border-0 bg-transparent ${examManagementSubTab === 'create_edit' ? 'border-bottom border-primary border-3 fw-bold text-primary' : 'text-secondary'}`}
+                                onClick={() => setExamManagementSubTab('create_edit')}
+                            >
+                                시험 작성 / 수정
+                            </button>
+                            <button
+                                className={`px-4 py-2 border-0 bg-transparent ${examManagementSubTab === 'setup_test' ? 'border-bottom border-primary border-3 fw-bold text-primary' : 'text-secondary'}`}
+                                onClick={() => setExamManagementSubTab('setup_test')}
+                            >
+                                시험 설정
+                            </button>
                         </div>
 
-                        {/* 오른쪽: 저장된 시험 목록 */}
-                        <div className="col-md-4">
-                            <div className="card shadow-sm" style={{ position: 'sticky', top: '20px' }}>
-                                <div className="card-header bg-success text-white">
-                                    <h5 className="mb-0">저장된 시험 목록</h5>
-                                </div>
-                                <div className="card-body" style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                                    {examList.length === 0 ? (
-                                        <div className="text-center py-4 text-muted">
-                                            저장된 시험이 없습니다.
+                        {examManagementSubTab === 'create_edit' && (
+                            <div className="row">
+                                {/* 왼쪽: 시험 작성 영역 */}
+                                <div className="col-md-8">
+                                    <div className="card shadow-sm mb-4">
+                                        <div className="card-header bg-white">
+                                            <h4 className="mb-0">{isEditingExam ? '시험 수정' : '새 시험 만들기'}</h4>
                                         </div>
-                                    ) : (
-                                        <div className="list-group list-group-flush">
-                                            {examList.map((exam) => (
-                                                <div 
-                                                    key={exam.id} 
-                                                    className={`list-group-item list-group-item-action ${selectedExamId === exam.id ? 'active' : ''}`}
-                                                    style={{ cursor: 'pointer' }}
+                                        <div className="card-body">
+                                            <div className="mb-3">
+                                                <label className="form-label fw-bold">시험 이름</label>
+                                                <input 
+                                                    type="text" 
+                                                    className="form-control form-control-lg" 
+                                                    placeholder="예: 2024년 1학기 중간고사"
+                                                    value={examName}
+                                                    onChange={(e) => setExamName(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="d-flex gap-2">
+                                                <button 
+                                                    className="btn btn-primary flex-fill"
+                                                    onClick={saveExam}
+                                                    disabled={!examName.trim() || (examProblemIds.length === 0 && !loadedExamHtmlContent)}
                                                 >
-                                                    <div className="d-flex justify-content-between align-items-start">
-                                                        <div className="flex-grow-1" onClick={() => loadExam(exam.id)}>
+                                                    {isEditingExam ? '수정 완료' : '시험 저장'}
+                                                </button>
+                                                {isEditingExam && (
+                                                    <button 
+                                                        className="btn btn-outline-secondary"
+                                                        onClick={createNewExam}
+                                                    >
+                                                        새 시험 만들기
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="card shadow-sm">
+                                        <div className="card-header bg-primary text-white">
+                                            <h4 className="mb-0">
+                                                시험 문제 목록 ({loadedExamHtmlContent ? 
+                                                    (examList.find(e => e.id === selectedExamId)?.questionCount || 0) : 
+                                                    examProblemIds.length}개)
+                                            </h4>
+                                        </div>
+                                        <div className="card-body">
+                                            {loadedExamHtmlContent ? (
+                                                <div className="bg-light p-4 rounded">
+                                                    {renderLoadedExamContent(loadedExamHtmlContent)}
+                                                </div>
+                                            ) : examProblemIds.length === 0 ? (
+                                                <div className="text-center py-5 text-muted">
+                                                    선택된 시험 문제가 없습니다.<br />
+                                                    문제은행에서 문제를 선택해주세요.
+                                                </div>
+                                            ) : (
+                                                <div className="text-muted">문제 목록 표시 영역</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 오른쪽: 저장된 시험 목록 */}
+                                <div className="col-md-4">
+                                    <div className="card shadow-sm" style={{ position: 'sticky', top: '20px' }}>
+                                        <div className="card-header bg-success text-white">
+                                            <h5 className="mb-0">저장된 시험 목록</h5>
+                                        </div>
+                                        <div className="card-body" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                                            {examList.length === 0 ? (
+                                                <div className="text-center py-4 text-muted">
+                                                    저장된 시험이 없습니다.
+                                                </div>
+                                            ) : (
+                                                <div className="list-group list-group-flush">
+                                                    {examList.map((exam) => (
+                                                        <div 
+                                                            key={exam.id} 
+                                                            className={`list-group-item list-group-item-action ${selectedExamId === exam.id ? 'active' : ''}`}
+                                                            style={{ cursor: 'pointer' }}
+                                                        >
+                                                            <div className="d-flex justify-content-between align-items-start">
+                                                                <div className="flex-grow-1" onClick={() => loadExam(exam.id)}>
+                                                                    <h6 className="mb-1">{exam.title}</h6>
+                                                                    <small className={selectedExamId === exam.id ? 'text-white-50' : 'text-muted'}>
+                                                                        문제 수: {exam.questionCount}개<br />
+                                                                        생성일: {new Date(exam.createdAt).toLocaleDateString()}
+                                                                    </small>
+                                                                </div>
+                                                                <button 
+                                                                    className="btn btn-sm btn-outline-danger"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        deleteExam(exam.id);
+                                                                    }}
+                                                                >
+                                                                    삭제
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {examManagementSubTab === 'setup_test' && (
+                            <div className="row">
+                                {/* 왼쪽: 시험 선택 */}
+                                <div className="col-md-4">
+                                    <div className="card shadow-sm">
+                                        <div className="card-header bg-warning text-dark">
+                                            <h5 className="mb-0">시험 선택</h5>
+                                        </div>
+                                        <div className="card-body" style={{ maxHeight: '600px', overflowY: 'auto' }}>
+                                            {examList.length === 0 ? (
+                                                <div className="text-center py-4 text-muted">
+                                                    저장된 시험이 없습니다.
+                                                </div>
+                                            ) : (
+                                                <div className="list-group">
+                                                    {examList.map((exam) => (
+                                                        <div 
+                                                            key={exam.id}
+                                                            className={`list-group-item list-group-item-action ${selectedExamForSetup === exam.id ? 'active' : ''}`}
+                                                            style={{ cursor: 'pointer' }}
+                                                            onClick={() => loadExamForSetup(exam.id)}
+                                                        >
                                                             <h6 className="mb-1">{exam.title}</h6>
-                                                            <small className={selectedExamId === exam.id ? 'text-white-50' : 'text-muted'}>
-                                                                문제 수: {exam.questionCount}개<br />
-                                                                생성일: {new Date(exam.createdAt).toLocaleDateString()}
+                                                            <small className={selectedExamForSetup === exam.id ? 'text-white-50' : 'text-muted'}>
+                                                                문제 수: {exam.questionCount}개
                                                             </small>
                                                         </div>
-                                                        <button 
-                                                            className="btn btn-sm btn-outline-danger"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                deleteExam(exam.id);
-                                                            }}
-                                                        >
-                                                            삭제
-                                                        </button>
-                                                    </div>
+                                                    ))}
                                                 </div>
-                                            ))}
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 오른쪽: 문제별 시간 설정 */}
+                                <div className="col-md-8">
+                                    {selectedExamForSetup ? (
+                                        <div className="card shadow-sm">
+                                            <div className="card-header bg-primary text-white">
+                                                <h5 className="mb-0">문제별 시간 설정</h5>
+                                            </div>
+                                            <div className="card-body" style={{ maxHeight: '700px', overflowY: 'auto' }}>
+                                                <button className="btn btn-success w-100 mb-3 fw-bold fs-4" style={{height:'50px'}}>
+                                                    시간 설정 저장
+                                                </button>
+                                                {Array.from(problemTimeLimits.entries()).map(([problemNum, seconds]) => {
+                                                    return (
+                                                        <div key={problemNum} className="mb-4 p-4 border rounded bg-white">
+                                                            <div className="d-flex justify-content-between align-items-center mb-3">
+                                                                <h5 className="mb-0 text-primary">문제 {problemNum}</h5>
+                                                                <div className="d-flex gap-2 align-items-center">
+                                                                    <input
+                                                                        type="number"
+                                                                        min="0"
+                                                                        className="form-control"
+                                                                        style={{ width: '100px' }}
+                                                                        value={inputValues.get(problemNum) ?? problemTimeLimits.get(problemNum)?.toString() ?? ""}
+                                                                        onWheel={(e) => e.currentTarget.blur()}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                                                                            e.preventDefault();
+                                                                            }
+                                                                        }}
+                                                                        onChange={(e) => {
+                                                                            const value = e.target.value;
+
+                                                                            setInputValues(prev => {
+                                                                            const newMap = new Map(prev);
+                                                                            newMap.set(problemNum, value);
+                                                                            return newMap;
+                                                                            });
+                                                                        }}
+                                                                        onBlur={() => {
+                                                                            const currentValue = inputValues.get(problemNum);
+
+                                                                            if (!currentValue) {
+                                                                                setProblemTimeLimits(prev => {
+                                                                                    const newMap = new Map(prev);
+                                                                                    newMap.set(problemNum, 0);
+                                                                                    return newMap;
+                                                                                });
+
+                                                                                setInputValues(prev => {
+                                                                                    const newMap = new Map(prev);
+                                                                                    newMap.set(problemNum, "0");
+                                                                                    return newMap;
+                                                                                });
+
+                                                                                } else {
+                                                                                    const num = Number(currentValue);
+                                                                                    setProblemTimeLimits(prev => {
+                                                                                        const newMap = new Map(prev);
+                                                                                        newMap.set(problemNum, num);
+                                                                                        return newMap;
+                                                                                    }
+                                                                                );
+                                                                            }
+                                                                        }}
+                                                                        placeholder="초"
+                                                                    />
+                                                                    <span className="fw-bold">초</span>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            {(() => {
+                                                                if (!selectedExamForSetupContent) return null;
+                                                                
+                                                                const parser = new DOMParser();
+                                                                const doc = parser.parseFromString(selectedExamForSetupContent, 'text/html');
+                                                                const h2Elements = doc.querySelectorAll('h2');
+                                                                
+                                                                let problemTextContent = '';
+                                                                let problemHtmlElements: string[] = [];
+                                                                let answerContent = null;
+                                                                
+                                                                h2Elements.forEach(h2 => {
+                                                                    const problemMatch = h2.textContent?.match(/문제 (\d+)/);
+                                                                    if (problemMatch && parseInt(problemMatch[1]) === problemNum) {
+                                                                        let currentNode: Node | null = h2.nextSibling;
+                                                                        
+                                                                        while (currentNode) {
+                                                                            // Element 노드인 경우
+                                                                            if (currentNode.nodeType === Node.ELEMENT_NODE) {
+                                                                                const element = currentNode as Element;
+                                                                                const tagName = element.tagName.toLowerCase();
+                                                                                
+                                                                                // 다음 문제나 구분선을 만나면 중단
+                                                                                if (tagName === 'h2' || tagName === 'hr') {
+                                                                                    break;
+                                                                                }
+                                                                                
+                                                                                // <p><strong>정답:</strong> ... </p> 형식 찾기
+                                                                                if (tagName === 'p') {
+                                                                                    const strongTag = element.querySelector('strong');
+                                                                                    if (strongTag && strongTag.textContent?.includes('정답')) {
+                                                                                        const fullText = element.textContent || '';
+                                                                                        const answerMatch = fullText.match(/정답:\s*(.+)/);
+                                                                                        if (answerMatch) {
+                                                                                            answerContent = answerMatch[1].trim();
+                                                                                        }
+                                                                                        break;
+                                                                                    }
+                                                                                }
+                                                                                
+                                                                                // Element를 배열에 추가
+                                                                                problemHtmlElements.push(element.outerHTML);
+                                                                            } 
+                                                                            // Text 노드인 경우
+                                                                            else if (currentNode.nodeType === Node.TEXT_NODE) {
+                                                                                const textContent = currentNode.textContent || '';
+                                                                                if (textContent.trim()) {
+                                                                                    problemTextContent += textContent;
+                                                                                }
+                                                                            }
+                                                                            
+                                                                            currentNode = currentNode.nextSibling;
+                                                                        }
+                                                                    }
+                                                                });
+                                                                
+                                                                const renderMathContent = (text: string) => {
+                                                                    if (!text) return null;
+                                                                    
+                                                                    const parts = text.split(/(\$[^$]+\$)/g);
+                                                                    return parts.map((part, idx) => {
+                                                                        if (part.startsWith('$') && part.endsWith('$')) {
+                                                                            const math = part.slice(1, -1);
+                                                                            return <InlineMath key={idx} math={math} />;
+                                                                        }
+                                                                        return <span key={idx}>{part}</span>;
+                                                                    });
+                                                                };
+                                                                
+                                                                return (
+                                                                    <>
+                                                                        <div className="mb-3">
+                                                                            <div className="p-3 bg-light rounded problem-content-wrapper" style={{ overflow: 'hidden' }}>
+                                                                                {(problemTextContent || problemHtmlElements.length > 0) ? (
+                                                                                    <>
+                                                                                        {/* 텍스트 노드 렌더링 (수학 기호 포함) */}
+                                                                                        {problemTextContent && (
+                                                                                            <div>{renderProblemContent(problemTextContent)}</div>
+                                                                                        )}
+                                                                                        {/* HTML 요소 렌더링 */}
+                                                                                        {problemHtmlElements.map((html, idx) => (
+                                                                                            <div key={idx} dangerouslySetInnerHTML={{ __html: html }} />
+                                                                                        ))}
+                                                                                    </>
+                                                                                ) : (
+                                                                                    <div className="text-muted">문제 내용을 불러올 수 없습니다.</div>
+                                                                                )}
+                                                                                <style>{`
+                                                                                    .problem-content-wrapper img {
+                                                                                        max-width: 80% !important;
+                                                                                        height: auto !important;
+                                                                                    }
+                                                                                `}</style>
+                                                                            </div>
+                                                                        </div>
+                                                                        
+                                                                        {answerContent && (
+                                                                            <div className="mb-3">
+                                                                                <div className="fw-bold text-success mb-2">정답:</div>
+                                                                                <div className="p-3 bg-success-subtle rounded">
+                                                                                    <span className="fw-bold text-success fs-5">
+                                                                                        {renderMathContent(answerContent)}
+                                                                                    </span>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </>
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="card shadow-sm">
+                                            <div className="card-body text-center py-5 text-muted">
+                                                왼쪽에서 시험을 선택하세요
+                                            </div>
                                         </div>
                                     )}
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

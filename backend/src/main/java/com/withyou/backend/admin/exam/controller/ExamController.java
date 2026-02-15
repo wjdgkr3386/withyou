@@ -31,6 +31,7 @@ public class ExamController {
     public ResponseEntity<ApiResponse<Exam>> getExamById(@PathVariable Long id) {
         System.out.println("ExamController - getExamById: " + id);
         Exam exam = examService.findExamById(id);
+        System.out.println(exam.getContent());
         return ResponseEntity.ok(ApiResponse.success("시험 상세 조회 성공", exam));
     }
 
