@@ -6,6 +6,7 @@ import com.withyou.backend.admin.exam.dto.ExamSaveRequestDTO;
 import com.withyou.backend.admin.exam.entity.Exam;
 import com.withyou.backend.admin.exam.entity.ExamOption;
 import com.withyou.backend.admin.exam.entity.ExamProblem;
+import com.withyou.backend.admin.exam.entity.ExamSubmission;
 import com.withyou.backend.admin.exam.repository.ExamRepository;
 import com.withyou.backend.admin.problem.entity.Problem;
 import com.withyou.backend.admin.problem.repository.ProblemRepository;
@@ -23,15 +24,52 @@ public class ExamService {
     private final ExamRepository examRepository;
     private final S3UploadService s3UploadService;
     private final ProblemRepository problemRepository;
+    private final com.withyou.backend.admin.exam.repository.ExamSubmissionRepository submissionRepository;
+    private final com.withyou.backend.account.repository.UserRepository userRepository;
     
     // 현재 활성화된 시험 방 코드 (메모리 저장)
     private static String currentRoomCode = "";
     private static Long currentExamId = null;
 
-    public ExamService(ExamRepository examRepository, S3UploadService s3UploadService, ProblemRepository problemRepository) {
+    public ExamService(ExamRepository examRepository, 
+                       S3UploadService s3UploadService, 
+                       ProblemRepository problemRepository,
+                       com.withyou.backend.admin.exam.repository.ExamSubmissionRepository submissionRepository,
+                       com.withyou.backend.account.repository.UserRepository userRepository) {
         this.examRepository = examRepository;
         this.s3UploadService = s3UploadService;
         this.problemRepository = problemRepository;
+        this.submissionRepository = submissionRepository;
+        this.userRepository = userRepository;
+    }
+
+    @Transactional
+    public void submitAnswer(Long userId, Long examId, int problemOrder, String answer) {
+        Exam exam = examRepository.findById(examId)
+                .orElseThrow(() -> new CustomException("시험을 찾을 수 없습니다."));
+        com.withyou.backend.account.entity.User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다."));
+
+        // 정답 채점 로직 (간단 비교)
+        boolean isCorrect = false;
+        ExamProblem problem = exam.getProblems().stream()
+                .filter(p -> p.getProblemOrder() == problemOrder)
+                .findFirst()
+                .orElse(null);
+        
+        if (problem != null && problem.getAnswer() != null) {
+            isCorrect = problem.getAnswer().trim().equals(answer.trim());
+        }
+
+        ExamSubmission submission = ExamSubmission.builder()
+                .user(user)
+                .exam(exam)
+                .problemOrder(problemOrder)
+                .submittedAnswer(answer)
+                .isCorrect(isCorrect)
+                .build();
+
+        submissionRepository.save(submission);
     }
 
     public List<Exam> findAllExams() {

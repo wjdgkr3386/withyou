@@ -86,6 +86,18 @@ public class ExamController {
         }
     }
 
+    // 정답 제출 API
+    @PostMapping("/submit")
+    public ResponseEntity<ApiResponse<Void>> submitAnswer(@RequestBody java.util.Map<String, Object> payload) {
+        Long userId = Long.valueOf(payload.get("userId").toString());
+        Long examId = Long.valueOf(payload.get("examId").toString());
+        int problemOrder = Integer.parseInt(payload.get("problemOrder").toString());
+        String answer = (String) payload.get("answer");
+
+        examService.submitAnswer(userId, examId, problemOrder, answer);
+        return ResponseEntity.ok(ApiResponse.success("제출 성공", null));
+    }
+
     // 시험 삭제
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteExam(@PathVariable Long id) {

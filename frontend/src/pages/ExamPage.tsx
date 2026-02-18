@@ -47,6 +47,7 @@ function ExamPage(){
     const [problemTime, setProblemTime] = useState<number>(0); 
     const [examId, setExamId] = useState<number | null>(examIdFromState || null);
     const [studentAnswer, setStudentAnswer] = useState<string>('');
+    const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
     // 웹소켓 Stomp 설정
     const stompClient = useRef<Stomp.Client | null>(null);
@@ -83,23 +84,70 @@ function ExamPage(){
                 setExamStatus("시험중");
                 const currentProblem = problems[currentIdx];
                 setProblemTime(currentProblem?.timeLimit || 10);
-                setStudentAnswer(''); // 문제 시작 시 정답 초기화
+                setStudentAnswer(''); 
+                setIsSubmitted(false);
             }
         } else if (examStatus === "시험중") {
             if (problemTime > 0) {
                 timerRef.current = setTimeout(() => setProblemTime(problemTime - 1), 1000);
             } else {
-                if (currentIdx < problems.length - 1) {
-                    setCurrentIdx(currentIdx + 1);
-                    setExamStatus("준비중");
-                    setCountdown(5);
-                } else {
-                    setExamStatus("종료");
-                }
+                const handleAutoSubmit = async () => {
+                    if (!isSubmitted && user && examId && problems[currentIdx]) {
+                        try {
+                            await axios.post(`${BASE_URL}/api/admin/exams/submit`, {
+                                userId: user.id,
+                                examId: examId,
+                                problemOrder: problems[currentIdx].problemOrder,
+                                answer: studentAnswer || "" 
+                            }, { withCredentials: true });
+                        } catch (error) { console.error(error); }
+                    }
+
+                    if (currentIdx < problems.length - 1) {
+                        setCurrentIdx(currentIdx + 1);
+                        setExamStatus("준비중");
+                        setCountdown(5);
+                    } else {
+                        setExamStatus("종료");
+                    }
+                };
+                handleAutoSubmit();
+            }
+        } else if (examStatus === "종료") {
+            // 시험 종료 시 웹소켓 연결 해제
+            if (stompClient.current && stompClient.current.connected) {
+                stompClient.current.disconnect(() => {
+                    console.log("시험 종료: 웹소켓 연결이 해제되었습니다.");
+                    setIsConnected(false);
+                });
             }
         }
         return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-    }, [examStatus, countdown, problemTime, currentIdx, problems]);
+    }, [examStatus, countdown, problemTime, currentIdx, problems, isSubmitted, studentAnswer, user, examId]);
+
+    // 정답 제출 함수
+    const handleSubmitAnswer = async () => {
+        if (!examId || !user) return;
+        if (!studentAnswer.trim()) {
+            alert("정답을 입력해주세요.");
+            return;
+        }
+
+        try {
+            await axios.post(`${BASE_URL}/api/admin/exams/submit`, {
+                userId: user.id,
+                examId: examId,
+                problemOrder: problems[currentIdx].problemOrder,
+                answer: studentAnswer
+            }, { withCredentials: true });
+            
+            setIsSubmitted(true);
+            console.log("정답 제출 성공");
+        } catch (error) {
+            console.error("정답 제출 실패:", error);
+            alert("정답 제출 중 오류가 발생했습니다.");
+        }
+    };
 
     // 수식 기호 추가 함수
     const addSymbol = (symbolValue: string) => {
@@ -141,7 +189,7 @@ function ExamPage(){
         });
     };
 
-    // 문제 내용 렌더링 (문제용)
+    // 문제 내용 렌더링
     const renderProblemContent = (content: string) => {
         if (!content) return null;
         return content.split('\n').map((line, idx) => {
@@ -161,16 +209,19 @@ function ExamPage(){
         });
     };
 
-    // 랜덤 코드 및 웹소켓 연결 로직 (기존과 동일)
+    // 랜덤 코드 및 웹소켓 연결
     useEffect(() => {
         const generateAndCreateRoom = async () => {
-            if (user && (user.role === 'ADMIN' || user.role === 'admin') && !roomCode) {
+            // 관리자이고, 정상적인 경로(examId 존재)로 들어왔을 때만 실행
+            if (user && (user.role === 'ADMIN' || user.role === 'admin') && examIdFromState && !roomCode) {
                 const code = Math.random().toString(36).substring(2, 8).toUpperCase();
                 setRoomCode(code);
                 try {
                     await axios.post(`${BASE_URL}/api/admin/exams/room/create`, { code, examId: examIdFromState }, { withCredentials: true });
                     connectWebSocket();
-                } catch (error) { console.error(error); }
+                } catch (error) { 
+                    console.error("방 생성 실패:", error); 
+                }
             }
         };
         generateAndCreateRoom();
@@ -288,7 +339,7 @@ function ExamPage(){
                         </div>
 
                         <div className="row g-5">
-                            <div className="col-md-7">
+                            <div className={problems[currentIdx].type === '객관식' ? "col-md-12" : "col-md-7"}>
                                 <div className="problem-content mb-4 bg-secondary bg-opacity-25 p-4 rounded shadow-sm overflow-auto" style={{ height: '400px' }}>
                                     <div className="fs-3 lh-base">{renderProblemContent(problems[currentIdx].content)}</div>
                                     {problems[currentIdx].imageUrl && (
@@ -300,55 +351,67 @@ function ExamPage(){
 
                                 {problems[currentIdx].type === '객관식' && problems[currentIdx].options && (
                                     <div className="row g-3">
-                                        {problems[currentIdx].options.map((opt: any, idx: number) => (
-                                            <div key={idx} className="col-md-6">
-                                                <div className="card bg-secondary border-0 h-100 hover-overlay shadow-sm" style={{ cursor: 'pointer' }} onClick={() => setStudentAnswer(String(opt.optionNumber))}>
-                                                    <div className="card-body d-flex align-items-start gap-3 p-3">
-                                                        <span className="fs-4 fw-bold text-info">{circleNumbers[opt.optionNumber-1] || opt.optionNumber}</span>
-                                                        <div className="fs-5">{renderProblemContent(opt.content)}</div>
+                                        {problems[currentIdx].options.map((opt: any, idx: number) => {
+                                            const isSelected = studentAnswer === String(opt.optionNumber);
+                                            return (
+                                                <div key={idx} className="col-md-6">
+                                                    <div 
+                                                        className={`card border-3 h-100 hover-overlay shadow-sm ${isSelected ? 'bg-primary border-info' : 'bg-secondary border-transparent'} ${isSubmitted ? 'opacity-75' : ''}`} 
+                                                        style={{ cursor: isSubmitted ? 'default' : 'pointer', transition: '0.2s' }} 
+                                                        onClick={() => {
+                                                            if (!isSubmitted) {
+                                                                setStudentAnswer(String(opt.optionNumber));
+                                                                // 객관식은 선택 시 자동 제출 (또는 선택 후 하단 버튼 클릭 유도 가능)
+                                                                // 여기서는 명시적인 확인을 위해 자동 제출 함수 호출을 고려할 수 있습니다.
+                                                            }
+                                                        }}
+                                                    >
+                                                        <div className="card-body d-flex align-items-start gap-3 p-3">
+                                                            <span className={`fs-4 fw-bold ${isSelected ? 'text-white' : 'text-info'}`}>{circleNumbers[opt.optionNumber-1] || opt.optionNumber}</span>
+                                                            <div className={`fs-5 ${isSelected ? 'text-white' : ''}`}>{renderProblemContent(opt.content)}</div>
+                                                        </div>
                                                     </div>
                                                 </div>
+                                            );
+                                        })}
+                                        {!isSubmitted && studentAnswer && (
+                                            <div className="col-12 mt-4 text-center">
+                                                <button className="btn btn-info btn-lg px-5 py-3 fw-bold fs-4 shadow" onClick={handleSubmitAnswer}>정답 제출</button>
                                             </div>
-                                        ))}
+                                        )}
+                                        {isSubmitted && (
+                                            <div className="col-12 mt-4 text-center">
+                                                <div className="alert alert-success d-inline-block px-5 py-2 fs-4 fw-bold">제출 완료</div>
+                                            </div>
+                                        )}
                                     </div>
                                 )}
                             </div>
                             
-                            <div className="col-md-5">
-                                <div className="card bg-secondary border-0 p-4 shadow-lg h-100">
-                                    <h4 className="fw-bold mb-3 border-bottom pb-2">답안 입력</h4>
-                                    
-                                    {/* 수식 도구 모음 */}
-                                    <div className="mb-3 bg-dark bg-opacity-50 p-2 rounded">
-                                        <div className="d-flex flex-wrap gap-1">
-                                            {Object.entries(SYMBOL_GROUPS).map(([group, symbols]) => (
-                                                <div key={group} className="d-flex flex-wrap gap-1">
-                                                    {symbols.map(s => (
-                                                        <button key={s.value} className="btn btn-sm btn-outline-info" style={{fontSize: '0.7rem'}} onClick={() => addSymbol(s.value)}>{s.label}</button>
-                                                    ))}
-                                                </div>
-                                            ))}
+                            {problems[currentIdx].type !== '객관식' && (
+                                <div className="col-md-5">
+                                    <div className="card bg-secondary border-0 p-4 shadow-lg h-100">
+                                        <h4 className="fw-bold mb-3 border-bottom pb-2">답안 입력</h4>
+                                        <div className="mb-3 bg-dark bg-opacity-50 p-2 rounded">
+                                            <div className="d-flex flex-wrap gap-1">
+                                                {Object.entries(SYMBOL_GROUPS).map(([group, symbols]) => (
+                                                    <div key={group} className="d-flex flex-wrap gap-1">
+                                                        {symbols.map(s => (
+                                                            <button key={s.value} className="btn btn-sm btn-outline-info" style={{fontSize: '0.7rem'}} onClick={() => addSymbol(s.value)}>{s.label}</button>
+                                                        ))}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
+                                        <textarea ref={answerRef} className={`form-control form-control-lg text-white border-info text-center mb-3 ${isSubmitted ? 'bg-secondary' : 'bg-dark'}`} rows={2} value={studentAnswer} onChange={(e) => setStudentAnswer(e.target.value)} placeholder={isSubmitted ? "제출이 완료되었습니다" : "정답 입력"} readOnly={isSubmitted} style={{fontSize: '1.5rem'}} />
+                                        <div className="p-3 border border-info rounded bg-dark bg-opacity-25 min-height-100 mb-3">
+                                            <div className="text-info small mb-1">실시간 미리보기:</div>
+                                            <div className="fs-4 text-center">{renderContent(studentAnswer)}</div>
+                                        </div>
+                                        <button className={`btn btn-lg w-100 fw-bold py-3 fs-4 ${isSubmitted ? 'btn-success disabled' : 'btn-info'}`} onClick={handleSubmitAnswer} disabled={isSubmitted}>{isSubmitted ? '제출 완료' : '정답 제출'}</button>
                                     </div>
-
-                                    <textarea 
-                                        ref={answerRef}
-                                        className="form-control form-control-lg bg-dark text-white border-info text-center mb-3" 
-                                        rows={2}
-                                        value={studentAnswer}
-                                        onChange={(e) => setStudentAnswer(e.target.value)}
-                                        placeholder="정답 입력" 
-                                        style={{fontSize: '1.5rem'}}
-                                    />
-
-                                    <div className="p-3 border border-info rounded bg-dark bg-opacity-25 min-height-100 mb-3">
-                                        <div className="text-info small mb-1">실시간 미리보기:</div>
-                                        <div className="fs-4 text-center">{renderContent(studentAnswer)}</div>
-                                    </div>
-
-                                    <button className="btn btn-info btn-lg w-100 fw-bold py-3 fs-4">정답 제출</button>
                                 </div>
-                            </div>
+                            )}
                         </div>
                     </div>
                 )}
