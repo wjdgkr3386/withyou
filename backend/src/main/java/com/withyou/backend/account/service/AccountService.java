@@ -237,4 +237,9 @@ public class AccountService {
             throw new CustomException("로그아웃 도중 오류가 발생했습니다. : "+e.getMessage());
         }
     }
+
+    public User findUserByUsername(String username) {
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다."));
+    }
 }

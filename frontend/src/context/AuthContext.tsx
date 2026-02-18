@@ -5,6 +5,8 @@ import { useLocation } from 'react-router-dom';
 interface User {
     username: string;
     role: string;
+    id: number;
+    name: string;
 }
 
 interface AuthContextType {
@@ -33,9 +35,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             );
 
             if (res.data.success) {
+                const data = res.data.data;
                 setUser({
-                    username: res.data.data.username,
-                    role: res.data.data.role,
+                    username: data.username,
+                    role: data.role,
+                    id: data.id,
+                    name: data.name
                 });
             }
         } catch {

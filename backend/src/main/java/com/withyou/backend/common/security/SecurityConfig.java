@@ -98,6 +98,8 @@ public class SecurityConfig {
                                 "/api/logout",
                                 "/api/mypage/profile",
                                 "/api/mypage/password",
+                                "/api/admin/exams/{id}",
+                                "/api/admin/exams/room/check",
                                 "/ws-stomp/**"
                         ).authenticated()
 

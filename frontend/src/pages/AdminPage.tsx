@@ -189,12 +189,18 @@ function Admin() {
             // 시험 문제 저장
             setLoadedExamProblems(exam.problems ?? []);
             
-            // 각 문제에 대해 기본 시간 설정 (0초)
+            // 각 문제의 저장된 제한 시간 설정
             const newTimeLimits = new Map<number, number>();
+            const newInputValues = new Map<number, string>();
+            
             (exam.problems ?? []).forEach((p: any) => {
-                newTimeLimits.set(p.problemOrder, problemTimeLimits.get(p.problemOrder) || 0);
+                const time = p.timeLimit || 0;
+                newTimeLimits.set(p.problemOrder, time);
+                newInputValues.set(p.problemOrder, String(time));
             });
+            
             setProblemTimeLimits(newTimeLimits);
+            setInputValues(newInputValues);
         } catch (error) {
             console.error('시험 로드 실패:', error);
             alert('시험을 불러오는 중 오류가 발생했습니다.');
@@ -230,6 +236,23 @@ function Admin() {
         } catch (error) {
             console.log('Error fetching exam list:', error);
             setExamList([]);
+        }
+    };
+
+    // 시간 설정 저장
+    const saveTimeLimits = async () => {
+        if (!selectedExamForSetup) {
+            alert("시험을 먼저 선택해주세요.");
+            return;
+        }
+
+        try {
+            const timeLimitsObj = Object.fromEntries(problemTimeLimits);
+            await axios.put(`${BASE_URL}/api/admin/exams/${selectedExamForSetup}/time-limits`, timeLimitsObj, { withCredentials: true });
+            alert("시간 설정이 저장되었습니다.");
+        } catch (error) {
+            console.error("시간 설정 저장 실패:", error);
+            alert("시간 설정을 저장하는 중 오류가 발생했습니다.");
         }
     };
 
@@ -1575,9 +1598,35 @@ function Admin() {
                                                 <h5 className="mb-0">문제별 시간 설정</h5>
                                             </div>
                                             <div className="card-body" style={{ maxHeight: '700px', overflowY: 'auto' }}>
-                                                <button className="btn btn-success w-100 mb-3 fw-bold fs-4" style={{height:'50px'}}>
-                                                    시간 설정 저장
-                                                </button>
+                                                <div className="d-flex gap-2 mb-3">
+                                                    <button 
+                                                        className="btn btn-success flex-grow-1 fw-bold fs-4" 
+                                                        style={{height:'60px'}}
+                                                        onClick={saveTimeLimits}
+                                                    >
+                                                        시간 설정 저장
+                                                    </button>
+                                                    <button 
+                                                        className="btn btn-primary fw-bold fs-4" 
+                                                        style={{height:'60px', width: '40%'}}
+                                                        onClick={() => {
+                                                            // 제한 시간 검증 (최소 5초)
+                                                            const invalidProblems = Array.from(problemTimeLimits.entries())
+                                                                .filter(([_, seconds]) => seconds < 5);
+                                                            
+                                                            if (invalidProblems.length > 0) {
+                                                                alert(`문제 ${invalidProblems.map(([num]) => num).join(', ')}의 제한 시간이 5초 미만입니다.\n모든 문제는 최소 5초 이상이어야 합니다.`);
+                                                                return;
+                                                            }
+                                                            
+                                                            if (window.confirm("시험 대기방을 생성하시겠습니까?")) {
+                                                                navigate('/exam', { state: { examId: selectedExamForSetup, isHost: true } });
+                                                            }
+                                                        }}
+                                                    >
+                                                        시험 대기방 생성
+                                                    </button>
+                                                </div>
                                                 {Array.from(problemTimeLimits.entries()).map(([problemNum, seconds]) => {
                                                     return (
                                                         <div key={problemNum} className="mb-4 p-4 border rounded bg-white">

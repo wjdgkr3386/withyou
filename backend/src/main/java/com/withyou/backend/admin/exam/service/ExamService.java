@@ -23,6 +23,10 @@ public class ExamService {
     private final ExamRepository examRepository;
     private final S3UploadService s3UploadService;
     private final ProblemRepository problemRepository;
+    
+    // 현재 활성화된 시험 방 코드 (메모리 저장)
+    private static String currentRoomCode = "";
+    private static Long currentExamId = null;
 
     public ExamService(ExamRepository examRepository, S3UploadService s3UploadService, ProblemRepository problemRepository) {
         this.examRepository = examRepository;
@@ -32,6 +36,22 @@ public class ExamService {
 
     public List<Exam> findAllExams() {
         return examRepository.findAll();
+    }
+
+    // 방 코드 생성 (서버 메모리에 저장)
+    public void createRoom(String code, Long examId) {
+        currentRoomCode = code;
+        currentExamId = examId;
+        System.out.println("새로운 방이 생성되었습니다. 코드: " + code + ", 시험 ID: " + examId);
+    }
+
+    // 방 코드 확인
+    public boolean checkRoomCode(String code) {
+        return currentRoomCode != null && currentRoomCode.equals(code);
+    }
+
+    public Long getCurrentExamId() {
+        return currentExamId;
     }
 
     @Transactional(readOnly = true)
@@ -152,6 +172,20 @@ public class ExamService {
             return imageUrl.substring(imagesExamIndex);
         }
         return null;
+    }
+
+    @Transactional
+    public void updateTimeLimits(Long id, java.util.Map<Integer, Integer> timeLimits) {
+        Exam exam = examRepository.findById(id)
+                .orElseThrow(() -> new CustomException("시험을 찾을 수 없습니다. ID: " + id));
+
+        for (ExamProblem problem : exam.getProblems()) {
+            Integer time = timeLimits.get(problem.getProblemOrder());
+            if (time != null) {
+                problem.setTimeLimit(time);
+            }
+        }
+        examRepository.save(exam);
     }
 
     @Transactional

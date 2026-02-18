@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@RequestMapping("api/admin/exams")
+@RequestMapping("/api/admin/exams")
 @RestController
 public class ExamController {
 
@@ -49,6 +49,41 @@ public class ExamController {
     ) {
         Exam updatedExam = examService.updateExam(id, requestDTO);
         return ResponseEntity.ok(ApiResponse.success("시험 수정 성공", updatedExam));
+    }
+
+    // 시간 설정 저장 전용 API
+    @PutMapping("/{id}/time-limits")
+    public ResponseEntity<ApiResponse<Void>> updateTimeLimits(
+            @PathVariable Long id,
+            @RequestBody java.util.Map<Integer, Integer> timeLimits
+    ) {
+        examService.updateTimeLimits(id, timeLimits);
+        return ResponseEntity.ok(ApiResponse.success("시간 설정 저장 성공", null));
+    }
+
+    // 시험 대기방 코드 생성 API
+    @PostMapping("/room/create")
+    public ResponseEntity<ApiResponse<Void>> createRoom(@RequestBody java.util.Map<String, Object> payload) {
+        String code = (String) payload.get("code");
+        Object examIdObj = payload.get("examId");
+        Long examId = null;
+        if (examIdObj instanceof Integer) examId = ((Integer) examIdObj).longValue();
+        else if (examIdObj instanceof Long) examId = (Long) examIdObj;
+        
+        examService.createRoom(code, examId);
+        return ResponseEntity.ok(ApiResponse.success("방 코드 생성 성공", null));
+    }
+
+    // 시험 대기방 코드 확인 API
+    @PostMapping("/room/check")
+    public ResponseEntity<ApiResponse<Long>> checkRoomCode(@RequestBody java.util.Map<String, String> payload) {
+        String code = payload.get("code");
+        boolean isValid = examService.checkRoomCode(code);
+        if (isValid) {
+            return ResponseEntity.ok(ApiResponse.success("입장 허용", examService.getCurrentExamId()));
+        } else {
+            return ResponseEntity.status(401).body(ApiResponse.error("입장 코드가 일치하지 않습니다."));
+        }
     }
 
     // 시험 삭제

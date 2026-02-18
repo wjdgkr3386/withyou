@@ -112,19 +112,17 @@ public class AccountController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<LoginResponse>> getMyInfo() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        // 이름 확인
-        String username = authentication.getName();
-        // 권한 확인
-        String role = authentication.getAuthorities().stream()
-                .findFirst()
-                .map(GrantedAuthority::getAuthority)
-                .orElse("ROLE_USER").replace("ROLE_", "");
-
-        if (username == null || username.equals("anonymousUser")) {
+        
+        if (authentication == null || authentication.getName().equals("anonymousUser")) {
             return ResponseEntity.status(401).body(ApiResponse.error("로그인 필요"));
         }
 
-        LoginResponse response = new LoginResponse(username, role);
+        String username = authentication.getName();
+        com.withyou.backend.account.entity.User user = accountService.findUserByUsername(username);
+
+        String role = user.getRole().name();
+
+        LoginResponse response = new LoginResponse(user.getUsername(), role, user.getId(), user.getName());
         return ResponseEntity.ok(ApiResponse.success("조회 성공", response));
     }
 
