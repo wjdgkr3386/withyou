@@ -1,5 +1,6 @@
 package com.withyou.backend.admin.exam.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.withyou.backend.common.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -8,30 +9,28 @@ import lombok.NoArgsConstructor;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 
-import java.util.ArrayList;
-import java.util.List;
-
 @Entity
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@Table(name = "exams")
-public class Exam extends BaseEntity {
+@Table(name = "exam_options")
+public class ExamOption extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private String title;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "exam_problem_id")
+    @JsonIgnore
+    private ExamProblem problem;
 
     @Column(nullable = false)
-    private int questionCount;
+    private int optionOrder;
 
-    @OneToMany(mappedBy = "exam", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<ExamProblem> problems = new ArrayList<>();
-
+    @Lob
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
+    private String content;
 }

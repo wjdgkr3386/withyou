@@ -15,6 +15,7 @@ public class ExamProblemDto {
     private List<OptionDto> options;
     private Boolean hasImage;
     private String imageUrl;
+    private Integer timeLimit;
 
     @Data
     public static class OptionDto {

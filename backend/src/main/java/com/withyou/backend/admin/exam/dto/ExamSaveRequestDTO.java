@@ -11,7 +11,6 @@ import java.util.List;
 @NoArgsConstructor
 public class ExamSaveRequestDTO {
     private String title;
-    private String content; // This content might contain S3 image paths
     private int questionCount;
-    private List<Long> problemIds;
+    private List<ExamProblemDto> problems;
 }

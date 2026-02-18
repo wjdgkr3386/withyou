@@ -1,5 +1,6 @@
 package com.withyou.backend.admin.exam.controller;
 
+import com.withyou.backend.admin.exam.dto.ExamResponseDTO;
 import com.withyou.backend.admin.exam.dto.ExamSaveRequestDTO;
 import com.withyou.backend.admin.exam.entity.Exam;
 import com.withyou.backend.admin.exam.service.ExamService;
@@ -28,18 +29,14 @@ public class ExamController {
 
     // 시험 상세 조회
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Exam>> getExamById(@PathVariable Long id) {
-        System.out.println("ExamController - getExamById: " + id);
-        Exam exam = examService.findExamById(id);
-        System.out.println(exam.getContent());
+    public ResponseEntity<ApiResponse<ExamResponseDTO>> getExamById(@PathVariable Long id) {
+        ExamResponseDTO exam = examService.findExamById(id);
         return ResponseEntity.ok(ApiResponse.success("시험 상세 조회 성공", exam));
     }
 
     // 시험 생성
     @PostMapping
     public ResponseEntity<ApiResponse<Exam>> createExam(@RequestBody ExamSaveRequestDTO requestDTO) {
-        System.out.println("ExamController - createExam");
-        System.out.println("Received problem IDs: " + requestDTO.getProblemIds());
         Exam savedExam = examService.saveExam(requestDTO);
         return ResponseEntity.ok(ApiResponse.success("시험 생성 성공", savedExam));
     }
@@ -50,7 +47,6 @@ public class ExamController {
             @PathVariable Long id,
             @RequestBody ExamSaveRequestDTO requestDTO
     ) {
-        System.out.println("ExamController - updateExam: " + id);
         Exam updatedExam = examService.updateExam(id, requestDTO);
         return ResponseEntity.ok(ApiResponse.success("시험 수정 성공", updatedExam));
     }
@@ -58,7 +54,6 @@ public class ExamController {
     // 시험 삭제
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteExam(@PathVariable Long id) {
-        System.out.println("ExamController - deleteExam: " + id);
         examService.deleteExam(id);
         return ResponseEntity.ok(ApiResponse.success("시험 삭제 성공", null));
     }
