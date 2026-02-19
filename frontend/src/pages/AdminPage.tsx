@@ -70,7 +70,8 @@ const SYMBOL_GROUPS = {
 const GRADE_MAP: { [key: string]: string } = {
     "E1": "초1", "E2": "초2", "E3": "초3", "E4": "초4", "E5": "초5", "E6": "초6",
     "M1": "중1", "M2": "중2", "M3": "중3",
-    "H1": "고1", "H2": "고2", "H3": "고3"
+    "H1": "고1", "H2": "고2", "H3": "고3",
+    "ADULT": "성인"
 };
 
 const BASE_URL = import.meta.env.VITE_API_URL;
@@ -81,6 +82,7 @@ interface Student {
     name: string;
     role: string;
     grade: string;
+    gender: string;
     email: string;
     createdAt: string;
 }
@@ -1848,8 +1850,8 @@ function Admin() {
                                                 onChange={(e) => { setStudentGenderFilter(e.target.value); setStudentPage(0); }}
                                             >
                                                 <option value="">성별 전체</option>
-                                                <option value="남">남성</option>
-                                                <option value="여">여성</option>
+                                                <option value="MALE">남성</option>
+                                                <option value="FEMALE">여성</option>
                                             </select>
                                         </div>
                                         {/* 학년 필터 */}
@@ -1861,6 +1863,7 @@ function Admin() {
                                             >
                                                 <option value="">학년 전체</option>
                                                 {GRADE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                                <option value="ADULT">성인</option>
                                             </select>
                                         </div>
                                         {/* 정렬 방식 */}
@@ -1903,11 +1906,12 @@ function Admin() {
                                         <tr>
                                             <th className="px-4 py-3" style={{ width: '8%' }}>ID</th>
                                             <th className="px-4 py-3" style={{ width: '12%' }}>이름</th>
+                                            <th className="px-4 py-3" style={{ width: '10%' }}>성별</th>
                                             <th className="px-4 py-3" style={{ width: '15%' }}>아이디</th>
-                                            <th className="px-4 py-3" style={{ width: '25%' }}>이메일</th>
+                                            <th className="px-4 py-3" style={{ width: '20%' }}>이메일</th>
                                             <th className="px-4 py-3" style={{ width: '12%' }}>학년</th>
                                             <th className="px-4 py-3" style={{ width: '13%' }}>가입 날짜</th>
-                                            <th className="px-4 py-3" style={{ width: '15%' }}>역할</th>
+                                            <th className="px-4 py-3" style={{ width: '10%' }}>역할</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1916,6 +1920,9 @@ function Admin() {
                                                 <tr key={student.id}>
                                                     <td className="px-4 py-3 text-muted">{student.id}</td>
                                                     <td className="px-4 py-3 fw-bold">{student.name}</td>
+                                                    <td className="px-4 py-3">
+                                                        {student.gender === 'MALE' ? '남' : student.gender === 'FEMALE' ? '여' : student.gender || '-'}
+                                                    </td>
                                                     <td className="px-4 py-3">{student.username}</td>
                                                     <td className="px-4 py-3 text-muted" style={{ wordBreak: 'break-all' }}>
                                                         {student.email || '-'}
@@ -1937,7 +1944,7 @@ function Admin() {
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan={7} className="text-center py-5 text-muted">
+                                                <td colSpan={8} className="text-center py-5 text-muted">
                                                     등록된 학생 정보가 없습니다.
                                                 </td>
                                             </tr>

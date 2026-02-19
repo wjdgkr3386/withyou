@@ -11,6 +11,7 @@ public class LoginResponse {
     private Long id;
     private String name;
     private String grade;
+    private String gender;
     private String email;
     private java.time.LocalDateTime createdAt;
 }

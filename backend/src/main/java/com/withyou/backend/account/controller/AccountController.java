@@ -129,6 +129,7 @@ public class AccountController {
                 user.getId(), 
                 user.getName(), 
                 grade, 
+                user.getGender() != null ? user.getGender() : "",
                 user.getEmail() != null ? user.getEmail() : "",
                 user.getCreatedAt()
         );
@@ -180,6 +181,7 @@ public class AccountController {
                         user.getId(), 
                         user.getName(),
                         user.getGrade() != null ? user.getGrade().name() : "",
+                        user.getGender() != null ? user.getGender() : "",
                         user.getEmail() != null ? user.getEmail() : "",
                         user.getCreatedAt()
                 ))
