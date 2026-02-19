@@ -108,7 +108,7 @@ public class AccountController {
         return ResponseEntity.ok().build();
     }
 
-    // 네비바 로그인 롹인
+    // 네비바 로그인 확인
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<LoginResponse>> getMyInfo() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -121,8 +121,17 @@ public class AccountController {
         com.withyou.backend.account.entity.User user = accountService.findUserByUsername(username);
 
         String role = user.getRole().name();
+        String grade = user.getGrade() != null ? user.getGrade().name() : "";
 
-        LoginResponse response = new LoginResponse(user.getUsername(), role, user.getId(), user.getName());
+        LoginResponse response = new LoginResponse(
+                user.getUsername(), 
+                role, 
+                user.getId(), 
+                user.getName(), 
+                grade, 
+                user.getEmail() != null ? user.getEmail() : "",
+                user.getCreatedAt()
+        );
         return ResponseEntity.ok(ApiResponse.success("조회 성공", response));
     }
 
@@ -140,6 +149,49 @@ public class AccountController {
         response.addCookie(cookie);
 
         return ResponseEntity.ok(ApiResponse.success("회원탈퇴 완료", null));
+    }
+
+    // =========================================================
+    // 관리자용 학생 관리 (페이징 / 필터 / 정렬)
+    // =========================================================
+    @GetMapping("/admin/users")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getAllStudents(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(required = false) String name,
+            @RequestParam(required = false) com.withyou.backend.account.entity.Grade grade,
+            @RequestParam(required = false) String gender,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
+            @RequestParam(defaultValue = "DESC") String sortDir
+    ) {
+        org.springframework.data.domain.Sort sort = sortDir.equalsIgnoreCase("ASC") 
+                ? org.springframework.data.domain.Sort.by(sortBy).ascending() 
+                : org.springframework.data.domain.Sort.by(sortBy).descending();
+        
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, sort);
+
+        org.springframework.data.domain.Page<com.withyou.backend.account.entity.User> studentsPage = 
+                accountService.findStudentsPaged(name, grade, gender, pageable);
+        
+        java.util.List<LoginResponse> studentsList = studentsPage.getContent().stream()
+                .map(user -> new LoginResponse(
+                        user.getUsername(), 
+                        user.getRole().name(), 
+                        user.getId(), 
+                        user.getName(),
+                        user.getGrade() != null ? user.getGrade().name() : "",
+                        user.getEmail() != null ? user.getEmail() : "",
+                        user.getCreatedAt()
+                ))
+                .toList();
+        
+        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        response.put("list", studentsList);
+        response.put("totalElements", studentsPage.getTotalElements());
+        response.put("totalPages", studentsPage.getTotalPages());
+        response.put("currentPage", studentsPage.getNumber());
+                
+        return ResponseEntity.ok(ApiResponse.success("학생 목록 조회 성공", response));
     }
 
 }

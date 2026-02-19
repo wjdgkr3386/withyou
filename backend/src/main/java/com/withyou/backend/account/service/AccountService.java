@@ -242,4 +242,20 @@ public class AccountService {
         return userRepository.findByUsername(username)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다."));
     }
+
+    // ===================
+    // 학생 목록 조회 (관리자용 - 페이징 및 필터)
+    // ===================
+    public org.springframework.data.domain.Page<User> findStudentsPaged(
+            String name, 
+            com.withyou.backend.account.entity.Grade grade, 
+            String gender,
+            org.springframework.data.domain.Pageable pageable) {
+        
+        // 검색 필터 전처리
+        String searchName = (name != null && !name.trim().isEmpty()) ? name.trim() : null;
+        String searchGender = (gender != null && !gender.trim().isEmpty()) ? gender : null;
+        
+        return userRepository.findStudentsPaged(Role.USER, searchName, grade, searchGender, pageable);
+    }
 }

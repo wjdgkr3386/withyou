@@ -8,7 +8,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @Table(name = "users")
-public class User {
+public class User extends com.withyou.backend.common.entity.BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

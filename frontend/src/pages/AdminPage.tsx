@@ -75,6 +75,16 @@ const GRADE_MAP: { [key: string]: string } = {
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
+interface Student {
+    id: number;
+    username: string;
+    name: string;
+    role: string;
+    grade: string;
+    email: string;
+    createdAt: string;
+}
+
 function Admin() {
     const navigate = useNavigate();
     const [active, setActive] = useState<string>('대시보드');
@@ -169,11 +179,66 @@ function Admin() {
     const [image, setImage] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string>('');
     const [examJoinCnt, setExamJoinCnt] = useState<number>(0);
+    const [studentList, setStudentList] = useState<Student[]>([]);
+    
+    // 학생 관리 필터 및 페이징 상태
+    const [studentPage, setStudentPage] = useState<number>(0);
+    const [studentSize, setStudentSize] = useState<number>(10);
+    const [studentTotalPages, setStudentTotalPages] = useState<number>(0);
+    const [studentTotalElements, setStudentTotalElements] = useState<number>(0);
+
+    const [studentNameFilter, setStudentNameFilter] = useState<string>('');
+    const [studentGradeFilter, setStudentGradeFilter] = useState<string>('');
+    const [studentGenderFilter, setStudentGenderFilter] = useState<string>('');
+    const [studentSortBy, setStudentSortBy] = useState<string>('createdAt');
+    const [studentSortDir, setStudentSortDir] = useState<string>('DESC');
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const answerRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const loadedContentRef = useRef<HTMLDivElement>(null);
+
+    // 학생 목록 불러오기
+    useEffect(() => {
+        if (active === '학생 관리') {
+            fetchStudentList();
+        }
+    }, [active, studentPage, studentSize, studentGradeFilter, studentGenderFilter, studentSortBy, studentSortDir]);
+
+    const fetchStudentList = async () => {
+        try {
+            const params = {
+                page: studentPage,
+                size: studentSize,
+                name: studentNameFilter || undefined,
+                grade: studentGradeFilter || undefined,
+                gender: studentGenderFilter || undefined,
+                sortBy: studentSortBy,
+                sortDir: studentSortDir
+            };
+            const response = await axios.get(`${BASE_URL}/api/admin/users`, { 
+                params,
+                withCredentials: true 
+            });
+            const data = response.data?.data;
+            setStudentList(data?.list ?? []);
+            setStudentTotalPages(data?.totalPages ?? 0);
+            setStudentTotalElements(data?.totalElements ?? 0);
+        } catch (error) {
+            console.log('Error fetching student list:', error);
+            setStudentList([]);
+        }
+    };
+
+    const formatDate = (dateString: string) => {
+        if (!dateString) return '-';
+        const date = new Date(dateString);
+        return date.toLocaleDateString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+    };
 
 
     // 시험 설정을 위해 선택된 시험 로드
@@ -1752,6 +1817,187 @@ function Admin() {
                             </div>
                         )}
                     </>
+                )}
+
+                {active === '학생 관리' && (
+                    <div className="card shadow-sm border-0">
+                        <div className="card-header bg-white py-3">
+                            <div className="row g-2 align-items-center">
+                                <div className="col-auto">
+                                    <span className="fs-5 fw-bold">학생 목록</span>
+                                    <span className="badge bg-primary ms-2">총 {studentTotalElements}명</span>
+                                </div>
+                                <div className="col">
+                                    <div className="d-flex gap-1 justify-content-end flex-wrap">
+                                        {/* 이름 검색 */}
+                                        <div style={{ width: '150px' }}>
+                                            <input 
+                                                type="text" 
+                                                className="form-control form-control-sm" 
+                                                placeholder="이름 검색..." 
+                                                value={studentNameFilter}
+                                                onChange={(e) => setStudentNameFilter(e.target.value)}
+                                                onKeyDown={(e) => e.key === 'Enter' && fetchStudentList()}
+                                            />
+                                        </div>
+                                        {/* 성별 필터 */}
+                                        <div style={{ width: '90px' }}>
+                                            <select 
+                                                className="form-select form-select-sm"
+                                                value={studentGenderFilter}
+                                                onChange={(e) => { setStudentGenderFilter(e.target.value); setStudentPage(0); }}
+                                            >
+                                                <option value="">성별 전체</option>
+                                                <option value="남">남성</option>
+                                                <option value="여">여성</option>
+                                            </select>
+                                        </div>
+                                        {/* 학년 필터 */}
+                                        <div style={{ width: '110px' }}>
+                                            <select 
+                                                className="form-select form-select-sm"
+                                                value={studentGradeFilter}
+                                                onChange={(e) => { setStudentGradeFilter(e.target.value); setStudentPage(0); }}
+                                            >
+                                                <option value="">학년 전체</option>
+                                                {GRADE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                                            </select>
+                                        </div>
+                                        {/* 정렬 방식 */}
+                                        <div style={{ width: '140px' }}>
+                                            <select 
+                                                className="form-select form-select-sm"
+                                                value={`${studentSortBy}-${studentSortDir}`}
+                                                onChange={(e) => {
+                                                    const [by, dir] = e.target.value.split('-');
+                                                    setStudentSortBy(by);
+                                                    setStudentSortDir(dir);
+                                                }}
+                                            >
+                                                <option value="createdAt-DESC">가입일 최신순</option>
+                                                <option value="createdAt-ASC">가입일 오래된순</option>
+                                                <option value="name-ASC">이름 오름차순</option>
+                                                <option value="name-DESC">이름 내림차순</option>
+                                            </select>
+                                        </div>
+                                        {/* 페이지 크기 */}
+                                        <div style={{ width: '90px' }}>
+                                            <select 
+                                                className="form-select form-select-sm"
+                                                value={studentSize}
+                                                onChange={(e) => { setStudentSize(Number(e.target.value)); setStudentPage(0); }}
+                                            >
+                                                <option value="10">10개씩</option>
+                                                <option value="20">20개씩</option>
+                                            </select>
+                                        </div>
+                                        <button className="btn btn-sm btn-primary px-3" onClick={() => { setStudentPage(0); fetchStudentList(); }}>검색</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="card-body p-0">
+                            <div className="table-responsive">
+                                <table className="table table-hover mb-0">
+                                    <thead className="table-light">
+                                        <tr>
+                                            <th className="px-4 py-3" style={{ width: '8%' }}>ID</th>
+                                            <th className="px-4 py-3" style={{ width: '12%' }}>이름</th>
+                                            <th className="px-4 py-3" style={{ width: '15%' }}>아이디</th>
+                                            <th className="px-4 py-3" style={{ width: '25%' }}>이메일</th>
+                                            <th className="px-4 py-3" style={{ width: '12%' }}>학년</th>
+                                            <th className="px-4 py-3" style={{ width: '13%' }}>가입 날짜</th>
+                                            <th className="px-4 py-3" style={{ width: '15%' }}>역할</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {studentList.length > 0 ? (
+                                            studentList.map((student) => (
+                                                <tr key={student.id}>
+                                                    <td className="px-4 py-3 text-muted">{student.id}</td>
+                                                    <td className="px-4 py-3 fw-bold">{student.name}</td>
+                                                    <td className="px-4 py-3">{student.username}</td>
+                                                    <td className="px-4 py-3 text-muted" style={{ wordBreak: 'break-all' }}>
+                                                        {student.email || '-'}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span className="badge bg-secondary-subtle text-secondary px-3 py-2">
+                                                            {GRADE_MAP[student.grade] || student.grade}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-muted small">
+                                                        {formatDate(student.createdAt)}
+                                                    </td>
+                                                    <td className="px-4 py-3">
+                                                        <span className="badge bg-info-subtle text-info px-3 py-2">
+                                                            {student.role}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))
+                                        ) : (
+                                            <tr>
+                                                <td colSpan={7} className="text-center py-5 text-muted">
+                                                    등록된 학생 정보가 없습니다.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                        {studentTotalPages > 1 && (
+                            <div className="card-footer bg-white py-3">
+                                <div className="d-flex justify-content-center align-items-center gap-1">
+                                    {/* 이전 버튼 */}
+                                    <button 
+                                        className="btn btn-sm btn-outline-secondary me-2" 
+                                        disabled={studentPage === 0}
+                                        onClick={() => setStudentPage(studentPage - 1)}
+                                    >
+                                        <i className="bi bi-chevron-left"></i>
+                                    </button>
+
+                                    {/* 페이지 번호 목록 */}
+                                    {(() => {
+                                        const pages = [];
+                                        let start = Math.max(0, studentPage - 4);
+                                        let end = Math.min(studentTotalPages - 1, studentPage + 4);
+
+                                        // 좌우 균형 맞추기 (총 9개가 안될 경우 확장)
+                                        if (studentPage < 4) {
+                                            end = Math.min(8, studentTotalPages - 1);
+                                        } else if (studentPage > studentTotalPages - 5) {
+                                            start = Math.max(0, studentTotalPages - 9);
+                                        }
+
+                                        for (let i = start; i <= end; i++) {
+                                            pages.push(
+                                                <button
+                                                    key={i}
+                                                    className={`btn btn-sm ${studentPage === i ? 'btn-primary' : 'btn-outline-primary'} mx-1`}
+                                                    style={{ minWidth: '35px' }}
+                                                    onClick={() => setStudentPage(i)}
+                                                >
+                                                    {i + 1}
+                                                </button>
+                                            );
+                                        }
+                                        return pages;
+                                    })()}
+
+                                    {/* 다음 버튼 */}
+                                    <button 
+                                        className="btn btn-sm btn-outline-secondary ms-2" 
+                                        disabled={studentPage + 1 >= studentTotalPages}
+                                        onClick={() => setStudentPage(studentPage + 1)}
+                                    >
+                                        <i className="bi bi-chevron-right"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
         </div>

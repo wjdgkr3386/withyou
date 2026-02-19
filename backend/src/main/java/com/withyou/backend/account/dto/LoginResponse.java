@@ -10,4 +10,7 @@ public class LoginResponse {
     private String role;
     private Long id;
     private String name;
+    private String grade;
+    private String email;
+    private java.time.LocalDateTime createdAt;
 }
