@@ -63,24 +63,27 @@ public class ExamController {
 
     // 시험 대기방 코드 생성 API
     @PostMapping("/room/create")
-    public ResponseEntity<ApiResponse<Void>> createRoom(@RequestBody java.util.Map<String, Object> payload) {
+    public ResponseEntity<ApiResponse<String>> createRoom(@RequestBody java.util.Map<String, Object> payload) {
         String code = (String) payload.get("code");
         Object examIdObj = payload.get("examId");
         Long examId = null;
         if (examIdObj instanceof Integer) examId = ((Integer) examIdObj).longValue();
         else if (examIdObj instanceof Long) examId = (Long) examIdObj;
         
-        examService.createRoom(code, examId);
-        return ResponseEntity.ok(ApiResponse.success("방 코드 생성 성공", null));
+        String sessionId = examService.createRoom(code, examId);
+        return ResponseEntity.ok(ApiResponse.success("방 코드 생성 성공", sessionId));
     }
 
     // 시험 대기방 코드 확인 API
     @PostMapping("/room/check")
-    public ResponseEntity<ApiResponse<Long>> checkRoomCode(@RequestBody java.util.Map<String, String> payload) {
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> checkRoomCode(@RequestBody java.util.Map<String, String> payload) {
         String code = payload.get("code");
         boolean isValid = examService.checkRoomCode(code);
         if (isValid) {
-            return ResponseEntity.ok(ApiResponse.success("입장 허용", examService.getCurrentExamId()));
+            java.util.Map<String, Object> response = new java.util.HashMap<>();
+            response.put("examId", examService.getCurrentExamId());
+            response.put("sessionId", examService.getCurrentSessionId());
+            return ResponseEntity.ok(ApiResponse.success("입장 허용", response));
         } else {
             return ResponseEntity.status(401).body(ApiResponse.error("입장 코드가 일치하지 않습니다."));
         }
@@ -93,9 +96,32 @@ public class ExamController {
         Long examId = Long.valueOf(payload.get("examId").toString());
         int problemOrder = Integer.parseInt(payload.get("problemOrder").toString());
         String answer = (String) payload.get("answer");
+        String sessionId = (String) payload.get("sessionId");
 
-        examService.submitAnswer(userId, examId, problemOrder, answer);
+        examService.submitAnswer(userId, examId, problemOrder, answer, sessionId);
         return ResponseEntity.ok(ApiResponse.success("제출 성공", null));
+    }
+
+    // 특정 시험의 세션 목록 조회
+    @GetMapping("/{id}/sessions")
+    public ResponseEntity<ApiResponse<java.util.List<String>>> getExamSessions(@PathVariable Long id) {
+        java.util.List<String> sessions = examService.getSessionIdsByExamId(id);
+        return ResponseEntity.ok(ApiResponse.success("세션 목록 조회 성공", sessions));
+    }
+
+    // 특정 세션의 성적 통계 조회
+    @GetMapping("/sessions/{sessionId}/stats")
+    public ResponseEntity<ApiResponse<java.util.List<java.util.Map<String, Object>>>> getSessionStats(@PathVariable String sessionId) {
+        java.util.List<java.util.Map<String, Object>> stats = examService.getSessionStats(sessionId);
+        return ResponseEntity.ok(ApiResponse.success("성적 통계 조회 성공", stats));
+    }
+
+    // 수동 채점 결과 반영 API
+    @PutMapping("/submissions/{id}/grade")
+    public ResponseEntity<ApiResponse<Void>> updateGrade(@PathVariable Long id, @RequestBody java.util.Map<String, Boolean> payload) {
+        boolean isCorrect = payload.get("isCorrect");
+        examService.updateSubmissionResult(id, isCorrect);
+        return ResponseEntity.ok(ApiResponse.success("채점 결과 반영 성공", null));
     }
 
     // 시험 삭제

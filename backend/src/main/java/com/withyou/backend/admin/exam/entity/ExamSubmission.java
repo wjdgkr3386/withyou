@@ -40,4 +40,7 @@ public class ExamSubmission extends BaseEntity {
     @Column(nullable = false)
     @Builder.Default
     private boolean isCorrect = false;
+
+    @Column(nullable = true)
+    private String sessionId;
 }

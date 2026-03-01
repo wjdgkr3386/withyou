@@ -169,7 +169,31 @@ function Admin() {
     const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
     const [isEditingExam, setIsEditingExam] = useState<boolean>(false);
     const [loadedExamProblems, setLoadedExamProblems] = useState<ExamProblem[]>([]);
-    const [examManagementSubTab, setExamManagementSubTab] = useState<'create_edit' | 'setup_test'>('create_edit');
+    const [examManagementSubTab, setExamManagementSubTab] = useState<'create_edit' | 'setup_test' | 'grading'>('create_edit');
+
+    // 채점 관련 상태 추가
+    const [gradingSessionStats, setGradingSessionStats] = useState<any[]>([]);
+    const [selectedGradingUser, setSelectedGradingUser] = useState<any>(null);
+
+    // 채점 결과 업데이트 핸들러
+    const handleUpdateGrade = async (submissionId: number, isCorrect: boolean, userIdx: number, subIdx: number) => {
+        try {
+            await axios.put(`${BASE_URL}/api/admin/exams/submissions/${submissionId}/grade`, { isCorrect }, { withCredentials: true });
+            
+            // 로컬 상태 업데이트
+            const newStats = [...gradingSessionStats];
+            newStats[userIdx].submissions[subIdx].isCorrect = isCorrect;
+            
+            // 맞은 개수 재계산
+            const correctCount = newStats[userIdx].submissions.filter((s: any) => s.isCorrect).length;
+            newStats[userIdx].correctCount = correctCount;
+            
+            setGradingSessionStats(newStats);
+        } catch (error) {
+            console.error("채점 반영 실패:", error);
+            alert("채점 결과 반영 중 오류가 발생했습니다.");
+        }
+    };
 
     // 시험 설정 상태 추가
     const [selectedExamForSetup, setSelectedExamForSetup] = useState<number | null>(null);
@@ -194,6 +218,13 @@ function Admin() {
     const [studentGenderFilter, setStudentGenderFilter] = useState<string>('');
     const [studentSortBy, setStudentSortBy] = useState<string>('createdAt');
     const [studentSortDir, setStudentSortDir] = useState<string>('DESC');
+
+    // 성적 및 채점 관리 공통 상태
+    const [examSessions, setExamSessions] = useState<string[]>([]);
+    const [selectedSessionId, setSelectedSessionId] = useState<string>('');
+    const [selectedExamForStats, setSelectedExamForStats] = useState<number | null>(null);
+    const [sessionStats, setSessionStats] = useState<any[]>([]);
+    const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
 
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const answerRef = useRef<HTMLTextAreaElement>(null);
@@ -1447,7 +1478,207 @@ function Admin() {
                             >
                                 시험 설정
                             </button>
+                            <button
+                                className={`px-4 py-2 border-0 bg-transparent ${examManagementSubTab === 'grading' ? 'border-bottom border-primary border-3 fw-bold text-primary' : 'text-secondary'}`}
+                                onClick={() => {
+                                    setExamManagementSubTab('grading');
+                                    setSelectedExamForSetup(null);
+                                    setGradingSessionStats([]);
+                                    setSelectedGradingUser(null);
+                                }}
+                            >
+                                채점 관리
+                            </button>
                         </div>
+
+                        {examManagementSubTab === 'grading' && (
+                            <div className="row">
+                                {/* 왼쪽: 시험 및 세션 선택 */}
+                                <div className="col-md-3">
+                                    <div className="card shadow-sm mb-4">
+                                        <div className="card-header bg-dark text-white py-3 fw-bold">시험 선택</div>
+                                        <div className="card-body p-0" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                                            <div className="list-group list-group-flush">
+                                                {examList.map(exam => (
+                                                    <button 
+                                                        key={exam.id} 
+                                                        className={`list-group-item list-group-item-action ${selectedExamId === exam.id ? 'active' : ''}`}
+                                                        onClick={async () => {
+                                                            setSelectedExamId(exam.id);
+                                                            loadExam(exam.id); // 시험 내용(loadedExamProblems) 즉시 로드
+                                                            const res = await axios.get(`${BASE_URL}/api/admin/exams/${exam.id}/sessions`, { withCredentials: true });
+                                                            setExamSessions(res.data.data || []);
+                                                            setGradingSessionStats([]);
+                                                            setSelectedGradingUser(null);
+                                                            setSelectedSessionId('');
+                                                        }}
+                                                    >
+                                                        {exam.title}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    {selectedExamId && (
+                                        <div className="card shadow-sm">
+                                            <div className="card-header bg-secondary text-white py-3 fw-bold">시험 회차 선택</div>
+                                            <div className="card-body p-0" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                                                <div className="list-group list-group-flush">
+                                                    {examSessions.map((sid, idx) => {
+                                                        const examTitle = examList.find(e => e.id === selectedExamId)?.title || "시험";
+                                                        return (
+                                                            <button 
+                                                                key={sid} 
+                                                                className={`list-group-item list-group-item-action ${selectedSessionId === sid ? 'bg-light fw-bold' : ''}`}
+                                                                onClick={async () => {
+                                                                    setSelectedSessionId(sid);
+                                                                    const res = await axios.get(`${BASE_URL}/api/admin/exams/sessions/${sid}/stats`, { withCredentials: true });
+                                                                    setGradingSessionStats(res.data.data || []);
+                                                                    setSelectedGradingUser(null);
+                                                                }}
+                                                            >
+                                                                {examTitle} ({examSessions.length - idx}차시)
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* 중앙: 학생 목록 */}
+                                <div className="col-md-3">
+                                    <div className="card shadow-sm h-100">
+                                        <div className="card-header bg-primary text-white py-3 fw-bold">응시 학생 목록</div>
+                                        <div className="card-body p-0">
+                                            {gradingSessionStats.length > 0 ? (
+                                                <div className="list-group list-group-flush">
+                                                    {gradingSessionStats.map((stat, idx) => (
+                                                        <button 
+                                                            key={idx} 
+                                                            className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${selectedGradingUser?.userId === stat.userId ? 'active' : ''}`}
+                                                            onClick={() => setSelectedGradingUser({...stat, userIdx: idx})}
+                                                        >
+                                                            <span>{stat.userName}</span>
+                                                            <span className={`badge ${selectedGradingUser?.userId === stat.userId ? 'bg-white text-primary' : 'bg-primary'}`}>
+                                                                {stat.correctCount} / {stat.totalQuestions}
+                                                            </span>
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <div className="p-4 text-center text-muted">회차를 선택하면 학생 목록이 나타납니다.</div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* 오른쪽: 상세 채점 및 시험 내용 영역 */}
+                                <div className="col-md-6">
+                                    {selectedExamId ? (
+                                        <div className="card shadow-sm">
+                                            <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                                                <h5 className="mb-0 fw-bold">
+                                                    {selectedGradingUser ? `[${selectedGradingUser.userName}] 채점 상세` : "시험 내용 및 정답 확인"}
+                                                </h5>
+                                                {selectedGradingUser && (
+                                                    <span className="text-muted small">응시: {new Date(selectedGradingUser.createdAt).toLocaleString()}</span>
+                                                )}
+                                            </div>
+                                            <div className="card-body" style={{ maxHeight: '750px', overflowY: 'auto' }}>
+                                                {loadedExamProblems.length > 0 ? (
+                                                    loadedExamProblems.sort((a,b) => a.problemOrder - b.problemOrder).map((p, pIdx) => {
+                                                        // 선택된 학생의 해당 문제 제출 정보 찾기
+                                                        const submission = selectedGradingUser?.submissions?.find((s: any) => s.problemOrder === p.problemOrder);
+                                                        
+                                                        return (
+                                                            <div key={pIdx} className={`card mb-4 border-2 ${submission ? (submission.isCorrect ? 'border-success' : 'border-danger') : 'border-secondary-subtle'}`}>
+                                                                <div className="card-header d-flex justify-content-between align-items-center py-2 bg-light">
+                                                                    <span className="fw-bold">문제 {p.problemOrder} ({p.type})</span>
+                                                                    {submission && (
+                                                                        <div className="btn-group">
+                                                                            <button 
+                                                                                className={`btn btn-sm ${submission.isCorrect ? 'btn-success' : 'btn-outline-success'}`}
+                                                                                onClick={() => handleUpdateGrade(submission.id, true, selectedGradingUser.userIdx, selectedGradingUser.submissions.indexOf(submission))}
+                                                                            >
+                                                                                정답
+                                                                            </button>
+                                                                            <button 
+                                                                                className={`btn btn-sm ${!submission.isCorrect ? 'btn-danger' : 'btn-outline-danger'}`}
+                                                                                onClick={() => handleUpdateGrade(submission.id, false, selectedGradingUser.userIdx, selectedGradingUser.submissions.indexOf(submission))}
+                                                                            >
+                                                                                오답
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                                <div className="card-body">
+                                                                    {/* 문제 내용 (항상 표시) */}
+                                                                    <div className="mb-3 p-2 bg-light rounded small border">
+                                                                        <div className="fw-bold mb-1 text-secondary border-bottom pb-1">문제 내용</div>
+                                                                        <div>{renderProblemContent(p.content)}</div>
+                                                                        {p.imageUrl && (
+                                                                            <div className="mt-2 text-center">
+                                                                                <img src={p.imageUrl} alt="문제 이미지" className="img-fluid rounded" style={{maxWidth: '300px'}} />
+                                                                            </div>
+                                                                        )}
+                                                                        {p.type === '객관식' && p.options && (
+                                                                            <div className="mt-2 small">
+                                                                                {p.options.map((opt: any) => (
+                                                                                    <div key={opt.optionNumber} className="d-flex gap-2">
+                                                                                        <span className="fw-bold">{['①', '②', '③', '④', '⑤'][opt.optionNumber-1] || opt.optionNumber}</span>
+                                                                                        <div>{renderProblemContent(opt.content)}</div>
+                                                                                    </div>
+                                                                                ))}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <div className="row g-2">
+                                                                        {/* 시스템 정답 (항상 표시) */}
+                                                                        <div className={selectedGradingUser ? "col-md-6" : "col-12"}>
+                                                                            <div className="p-2 border rounded bg-white h-100">
+                                                                                <div className="small text-muted mb-1">시스템 정답 (DB)</div>
+                                                                                <div className="fs-5 fw-bold text-success">
+                                                                                    {p.type === '객관식' ? `${p.answer}번` : renderProblemContent(p.answer)}
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                        
+                                                                        {/* 학생 제출 답안 (학생 선택 시에만 표시) */}
+                                                                        {selectedGradingUser && (
+                                                                            <div className="col-md-6">
+                                                                                <div className="p-2 border rounded bg-white h-100">
+                                                                                    <div className="small text-muted mb-1">학생 제출 답안</div>
+                                                                                    <div className={`fs-5 fw-bold ${!submission?.submittedAnswer?.trim() ? 'text-danger' : 'text-primary'}`}>
+                                                                                        {!submission?.submittedAnswer?.trim() ? "미제출" : (p.type === '객관식' ? `${submission.submittedAnswer}번` : renderProblemContent(submission.submittedAnswer))}
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <div className="text-center py-5">
+                                                        <div className="spinner-border text-primary mb-2"></div>
+                                                        <p>시험 내용을 불러오는 중입니다...</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="card shadow-sm border-0 py-5 text-center bg-white text-muted">
+                                            <h5>왼쪽에서 시험을 선택하여 채점을 시작하세요.</h5>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
 
                         {examManagementSubTab === 'create_edit' && (
                             <div className="row">

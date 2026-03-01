@@ -46,6 +46,7 @@ function ExamPage(){
     const [countdown, setCountdown] = useState<number>(5); 
     const [problemTime, setProblemTime] = useState<number>(0); 
     const [examId, setExamId] = useState<number | null>(examIdFromState || null);
+    const [sessionId, setSessionId] = useState<string>('');
     const [studentAnswer, setStudentAnswer] = useState<string>('');
     const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
@@ -92,13 +93,15 @@ function ExamPage(){
                 timerRef.current = setTimeout(() => setProblemTime(problemTime - 1), 1000);
             } else {
                 const handleAutoSubmit = async () => {
-                    if (!isSubmitted && user && examId && problems[currentIdx]) {
+                    // 관리자가 아니면서 제출되지 않은 경우에만 자동 제출 수행
+                    if (!isSubmitted && user && (user.role !== 'ADMIN' && user.role !== 'admin') && examId && problems[currentIdx]) {
                         try {
                             await axios.post(`${BASE_URL}/api/admin/exams/submit`, {
                                 userId: user.id,
                                 examId: examId,
                                 problemOrder: problems[currentIdx].problemOrder,
-                                answer: studentAnswer || "" 
+                                answer: studentAnswer || "",
+                                sessionId: sessionId
                             }, { withCredentials: true });
                         } catch (error) { console.error(error); }
                     }
@@ -123,11 +126,18 @@ function ExamPage(){
             }
         }
         return () => { if (timerRef.current) clearTimeout(timerRef.current); };
-    }, [examStatus, countdown, problemTime, currentIdx, problems, isSubmitted, studentAnswer, user, examId]);
+    }, [examStatus, countdown, problemTime, currentIdx, problems, isSubmitted, studentAnswer, user, examId, sessionId]);
 
     // 정답 제출 함수
     const handleSubmitAnswer = async () => {
         if (!examId || !user) return;
+        
+        // 관리자 제출 방지
+        if (user.role === 'ADMIN' || user.role === 'admin') {
+            alert("관리자는 정답을 제출할 수 없습니다.");
+            return;
+        }
+
         if (!studentAnswer.trim()) {
             alert("정답을 입력해주세요.");
             return;
@@ -138,7 +148,8 @@ function ExamPage(){
                 userId: user.id,
                 examId: examId,
                 problemOrder: problems[currentIdx].problemOrder,
-                answer: studentAnswer
+                answer: studentAnswer,
+                sessionId: sessionId
             }, { withCredentials: true });
             
             setIsSubmitted(true);
@@ -217,8 +228,11 @@ function ExamPage(){
                 const code = Math.random().toString(36).substring(2, 8).toUpperCase();
                 setRoomCode(code);
                 try {
-                    await axios.post(`${BASE_URL}/api/admin/exams/room/create`, { code, examId: examIdFromState }, { withCredentials: true });
-                    connectWebSocket();
+                    const res = await axios.post(`${BASE_URL}/api/admin/exams/room/create`, { code, examId: examIdFromState }, { withCredentials: true });
+                    if (res.data.success) {
+                        setSessionId(res.data.data); // 서버에서 생성된 sessionId 저장
+                        connectWebSocket();
+                    }
                 } catch (error) { 
                     console.error("방 생성 실패:", error); 
                 }
@@ -228,31 +242,108 @@ function ExamPage(){
     }, [user, examIdFromState]);
 
     const connectWebSocket = () => {
-        if (stompClient.current?.connected) return;
+        console.log("웹소켓 연결 시도...");
+        if (stompClient.current?.connected) {
+            console.log("이미 웹소켓이 연결되어 있습니다.");
+            setIsConnected(true);
+            return;
+        }
+        
         const socket = new SockJS(`${BASE_URL}/ws-stomp`);
         stompClient.current = Stomp.over(socket);
+        
+        // 디버그 로그 비활성화 (필요 시 주석 처리)
+        // stompClient.current.debug = () => {};
+
         stompClient.current.connect({}, (frame) => {
+            console.log("웹소켓 연결 성공:", frame);
             setIsConnected(true);
+            
             stompClient.current?.subscribe('/topic/exam/status', (response) => {
                 const data = JSON.parse(response.body);
-                if (data.type === 'START') { setExamStatus("준비중"); setCountdown(5); setCurrentIdx(0); }
+                console.log("시험 상태 변경 수신:", data);
+                if (data.type === 'START') { 
+                    setExamStatus("준비중"); 
+                    setCountdown(5); 
+                    setCurrentIdx(0); 
+                }
             });
-            stompClient.current?.subscribe('/topic/users', (response) => { setConnectedUsers(JSON.parse(response.body)); });
-            if (user?.name) stompClient.current?.send("/app/enter", {}, JSON.stringify({ name: user.name }));
+            
+            stompClient.current?.subscribe('/topic/users', (response) => { 
+                const users = JSON.parse(response.body);
+                console.log("접속자 목록 업데이트:", users);
+                setConnectedUsers(users); 
+            });
+            
+            if (user?.name) {
+                console.log("입장 메시지 전송:", user.name);
+                stompClient.current?.send("/app/enter", {}, JSON.stringify({ name: user.name }));
+            }
+        }, (error) => {
+            console.error("웹소켓 연결 에러:", error);
+            alert("서버와의 연결에 실패했습니다.");
         });
     };
 
     const handleStartExam = () => {
-        if (stompClient.current?.connected) stompClient.current.send("/app/exam/start", {}, JSON.stringify({ type: 'START' }));
+        if (stompClient.current?.connected) {
+            console.log("시험 시작 명령 전송");
+            stompClient.current.send("/app/exam/start", {}, JSON.stringify({ type: 'START' }));
+        } else {
+            alert("서버와 연결되어 있지 않습니다.");
+        }
     };
 
     const handleJoinRoom = async () => {
-        if (user?.role === 'ADMIN' || user?.role === 'admin') { connectWebSocket(); return; }
+        if (user?.role === 'ADMIN' || user?.role === 'admin') { 
+            console.log("관리자 계정으로 대기방 입장 시도");
+            connectWebSocket(); 
+            return; 
+        }
+        
         if (!inputCode) return alert("코드를 입력해주세요.");
+        
         try {
+            console.log("학생 입장 시도 - 코드:", inputCode);
             const res = await axios.post(`${BASE_URL}/api/admin/exams/room/check`, { code: inputCode }, { withCredentials: true });
-            if (res.data.success) { setExamId(res.data.data); connectWebSocket(); }
-        } catch (error) { alert("입장 코드가 올바르지 않습니다."); }
+            
+            if (res.data.success && res.data.data) { 
+                const data = res.data.data;
+                console.log("서버로부터 받은 정보:", data);
+                
+                const id = data.examId;
+                const sid = data.sessionId;
+                
+                if (id) {
+                    console.log("examId 설정:", id);
+                    setExamId(Number(id));
+                }
+                
+                if (sid) {
+                    console.log("sessionId 설정:", sid);
+                    setSessionId(sid);
+                }
+                
+                // 상태 업데이트 후 연결 시도
+                setTimeout(() => connectWebSocket(), 100); 
+            } else {
+                console.warn("입장 실패:", res.data.message);
+                alert(res.data.message || "입장 코드가 올바르지 않습니다.");
+            }
+        } catch (error: any) { 
+            console.error("API 요청 에러:", error);
+            const errMsg = error.response?.data?.message || "서버 통신 중 오류가 발생했습니다.";
+            alert(errMsg); 
+        }
+    };
+
+    const copyToClipboard = () => {
+        if (!roomCode) return;
+        navigator.clipboard.writeText(roomCode).then(() => {
+            alert("입장 코드가 클립보드에 복사되었습니다.");
+        }).catch(err => {
+            console.error("복사 실패:", err);
+        });
     };
 
     useEffect(() => { return () => { if (stompClient.current) stompClient.current.disconnect(() => {}); }; }, []);
@@ -272,7 +363,12 @@ function ExamPage(){
                                         {user?.role === 'ADMIN' || user?.role === 'admin' ? (
                                             <div className="admin-view">
                                                 <p className="fs-5 text-warning mb-2">학생들에게 아래 코드를 공유하세요</p>
-                                                <div className="display-1 fw-bold text-info mb-4" style={{ letterSpacing: '8px' }}>{roomCode}</div>
+                                                <div className="d-flex align-items-center justify-content-center gap-3 mb-4">
+                                                    <div className="display-1 fw-bold text-info" style={{ letterSpacing: '8px' }}>{roomCode}</div>
+                                                    <button className="btn btn-outline-info btn-sm" onClick={copyToClipboard} title="코드 복사">
+                                                        <i className="bi bi-clipboard fs-3">복사</i>
+                                                    </button>
+                                                </div>
                                                 <div className="spinner-border text-info mb-3"></div>
                                                 <p>서버 연결 중...</p>
                                             </div>
@@ -287,7 +383,14 @@ function ExamPage(){
                                 ) : (
                                     <div className="text-center">
                                         <div className="alert alert-success fw-bold fs-4 mb-4">{user?.role === 'ADMIN' || user?.role === 'admin' ? '입장 코드가 생성되었습니다' : '성공적으로 입장했습니다!'}</div>
-                                        {(user?.role === 'ADMIN' || user?.role === 'admin') && <div className="display-4 fw-bold text-info mb-5" style={{ letterSpacing: '8px' }}>{roomCode}</div>}
+                                        {(user?.role === 'ADMIN' || user?.role === 'admin') && (
+                                            <div className="d-flex align-items-center justify-content-center gap-3 mb-5">
+                                                <div className="display-4 fw-bold text-info" style={{ letterSpacing: '8px' }}>{roomCode}</div>
+                                                <button className="btn btn-outline-info btn-sm" onClick={copyToClipboard} title="코드 복사">
+                                                    <i className="bi bi-clipboard fs-4">복사</i>
+                                                </button>
+                                            </div>
+                                        )}
                                         <p className="fs-5 mb-4">관리자가 시험을 시작할 때까지 잠시 기다려 주세요.</p>
                                         {(user?.role === 'ADMIN' || user?.role === 'admin') && <button className="btn btn-primary btn-lg px-5 py-3 fw-bold fs-4" onClick={handleStartExam}>시험 시작하기</button>}
                                     </div>
@@ -353,16 +456,15 @@ function ExamPage(){
                                     <div className="row g-3">
                                         {problems[currentIdx].options.map((opt: any, idx: number) => {
                                             const isSelected = studentAnswer === String(opt.optionNumber);
+                                            const isAdmin = user?.role === 'ADMIN' || user?.role === 'admin';
                                             return (
                                                 <div key={idx} className="col-md-6">
                                                     <div 
-                                                        className={`card border-3 h-100 hover-overlay shadow-sm ${isSelected ? 'bg-primary border-info' : 'bg-secondary border-transparent'} ${isSubmitted ? 'opacity-75' : ''}`} 
-                                                        style={{ cursor: isSubmitted ? 'default' : 'pointer', transition: '0.2s' }} 
+                                                        className={`card border-3 h-100 hover-overlay shadow-sm ${isSelected ? 'bg-primary border-info' : 'bg-secondary border-transparent'} ${isSubmitted || isAdmin ? 'opacity-75' : ''}`} 
+                                                        style={{ cursor: (isSubmitted || isAdmin) ? 'default' : 'pointer', transition: '0.2s' }} 
                                                         onClick={() => {
-                                                            if (!isSubmitted) {
+                                                            if (!isSubmitted && !isAdmin) {
                                                                 setStudentAnswer(String(opt.optionNumber));
-                                                                // 객관식은 선택 시 자동 제출 (또는 선택 후 하단 버튼 클릭 유도 가능)
-                                                                // 여기서는 명시적인 확인을 위해 자동 제출 함수 호출을 고려할 수 있습니다.
                                                             }
                                                         }}
                                                     >
@@ -374,7 +476,7 @@ function ExamPage(){
                                                 </div>
                                             );
                                         })}
-                                        {!isSubmitted && studentAnswer && (
+                                        {!isSubmitted && studentAnswer && (user?.role !== 'ADMIN' && user?.role !== 'admin') && (
                                             <div className="col-12 mt-4 text-center">
                                                 <button className="btn btn-info btn-lg px-5 py-3 fw-bold fs-4 shadow" onClick={handleSubmitAnswer}>정답 제출</button>
                                             </div>
@@ -382,6 +484,11 @@ function ExamPage(){
                                         {isSubmitted && (
                                             <div className="col-12 mt-4 text-center">
                                                 <div className="alert alert-success d-inline-block px-5 py-2 fs-4 fw-bold">제출 완료</div>
+                                            </div>
+                                        )}
+                                        {(user?.role === 'ADMIN' || user?.role === 'admin') && (
+                                            <div className="col-12 mt-4 text-center">
+                                                <div className="alert alert-warning d-inline-block px-5 py-2 fs-4 fw-bold">관리자는 제출할 수 없습니다</div>
                                             </div>
                                         )}
                                     </div>
@@ -397,18 +504,41 @@ function ExamPage(){
                                                 {Object.entries(SYMBOL_GROUPS).map(([group, symbols]) => (
                                                     <div key={group} className="d-flex flex-wrap gap-1">
                                                         {symbols.map(s => (
-                                                            <button key={s.value} className="btn btn-sm btn-outline-info" style={{fontSize: '0.7rem'}} onClick={() => addSymbol(s.value)}>{s.label}</button>
+                                                            <button 
+                                                                key={s.value} 
+                                                                className="btn btn-sm btn-outline-info" 
+                                                                style={{fontSize: '0.7rem'}} 
+                                                                onClick={() => addSymbol(s.value)}
+                                                                disabled={user?.role === 'ADMIN' || user?.role === 'admin'}
+                                                            >
+                                                                {s.label}
+                                                            </button>
                                                         ))}
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
-                                        <textarea ref={answerRef} className={`form-control form-control-lg text-white border-info text-center mb-3 ${isSubmitted ? 'bg-secondary' : 'bg-dark'}`} rows={2} value={studentAnswer} onChange={(e) => setStudentAnswer(e.target.value)} placeholder={isSubmitted ? "제출이 완료되었습니다" : "정답 입력"} readOnly={isSubmitted} style={{fontSize: '1.5rem'}} />
+                                        <textarea 
+                                            ref={answerRef} 
+                                            className={`form-control form-control-lg text-white border-info text-center mb-3 ${isSubmitted || (user?.role === 'ADMIN' || user?.role === 'admin') ? 'bg-secondary' : 'bg-dark'}`} 
+                                            rows={2} 
+                                            value={studentAnswer} 
+                                            onChange={(e) => setStudentAnswer(e.target.value)} 
+                                            placeholder={isSubmitted ? "제출이 완료되었습니다" : (user?.role === 'ADMIN' || user?.role === 'admin' ? "관리자는 입력할 수 없습니다" : "정답 입력")} 
+                                            readOnly={isSubmitted || (user?.role === 'ADMIN' || user?.role === 'admin')} 
+                                            style={{fontSize: '1.5rem'}} 
+                                        />
                                         <div className="p-3 border border-info rounded bg-dark bg-opacity-25 min-height-100 mb-3">
                                             <div className="text-info small mb-1">실시간 미리보기:</div>
                                             <div className="fs-4 text-center">{renderContent(studentAnswer)}</div>
                                         </div>
-                                        <button className={`btn btn-lg w-100 fw-bold py-3 fs-4 ${isSubmitted ? 'btn-success disabled' : 'btn-info'}`} onClick={handleSubmitAnswer} disabled={isSubmitted}>{isSubmitted ? '제출 완료' : '정답 제출'}</button>
+                                        <button 
+                                            className={`btn btn-lg w-100 fw-bold py-3 fs-4 ${isSubmitted ? 'btn-success disabled' : 'btn-info'}`} 
+                                            onClick={handleSubmitAnswer} 
+                                            disabled={isSubmitted || (user?.role === 'ADMIN' || user?.role === 'admin')}
+                                        >
+                                            {isSubmitted ? '제출 완료' : (user?.role === 'ADMIN' || user?.role === 'admin' ? '관리자 제출 불가' : '정답 제출')}
+                                        </button>
                                     </div>
                                 </div>
                             )}
