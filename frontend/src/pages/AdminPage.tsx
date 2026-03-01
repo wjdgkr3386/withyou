@@ -100,7 +100,7 @@ function Admin() {
 
     const [data, setData] = useState<CategoryData>({});
 
-    const menus = ['대시보드', '카테고리 관리', '문제은행', '시험 관리', '학생 관리', '성적 관리',];
+    const menus = ['대시보드', '카테고리 관리', '문제은행', '시험 관리', '학생 관리', '성적 관리'];
     const grades = GRADE_OPTIONS.map(g => g.label);
 
     const currentKey = `${selectedGrade}-${selectedTerm}`;
@@ -169,11 +169,17 @@ function Admin() {
     const [selectedExamId, setSelectedExamId] = useState<number | null>(null);
     const [isEditingExam, setIsEditingExam] = useState<boolean>(false);
     const [loadedExamProblems, setLoadedExamProblems] = useState<ExamProblem[]>([]);
-    const [examManagementSubTab, setExamManagementSubTab] = useState<'create_edit' | 'setup_test' | 'grading'>('create_edit');
+    // ✅ 변경: 'grading' 서브탭 제거
+    const [examManagementSubTab, setExamManagementSubTab] = useState<'create_edit' | 'setup_test'>('create_edit');
 
-    // 채점 관련 상태 추가
+    // ✅ 채점 관련 상태 (성적 관리 탭용)
+    const [gradingExamList, setGradingExamList] = useState<Exam[]>([]);
+    const [gradingSelectedExamId, setGradingSelectedExamId] = useState<number | null>(null);
+    const [gradingExamSessions, setGradingExamSessions] = useState<string[]>([]);
+    const [gradingSelectedSessionId, setGradingSelectedSessionId] = useState<string>('');
     const [gradingSessionStats, setGradingSessionStats] = useState<any[]>([]);
     const [selectedGradingUser, setSelectedGradingUser] = useState<any>(null);
+    const [gradingLoadedProblems, setGradingLoadedProblems] = useState<ExamProblem[]>([]);
 
     // 채점 결과 업데이트 핸들러
     const handleUpdateGrade = async (submissionId: number, isCorrect: boolean, userIdx: number, subIdx: number) => {
@@ -219,13 +225,6 @@ function Admin() {
     const [studentSortBy, setStudentSortBy] = useState<string>('createdAt');
     const [studentSortDir, setStudentSortDir] = useState<string>('DESC');
 
-    // 성적 및 채점 관리 공통 상태
-    const [examSessions, setExamSessions] = useState<string[]>([]);
-    const [selectedSessionId, setSelectedSessionId] = useState<string>('');
-    const [selectedExamForStats, setSelectedExamForStats] = useState<number | null>(null);
-    const [sessionStats, setSessionStats] = useState<any[]>([]);
-    const [selectedUserDetail, setSelectedUserDetail] = useState<any>(null);
-
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const answerRef = useRef<HTMLTextAreaElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -237,6 +236,23 @@ function Admin() {
             fetchStudentList();
         }
     }, [active, studentPage, studentSize, studentGradeFilter, studentGenderFilter, studentSortBy, studentSortDir]);
+
+    // ✅ 성적 관리 탭 진입 시 시험 목록 불러오기
+    useEffect(() => {
+        if (active === '성적 관리') {
+            fetchGradingExamList();
+        }
+    }, [active]);
+
+    const fetchGradingExamList = async () => {
+        try {
+            const response = await axios.get(`${BASE_URL}/api/admin/exams`, { withCredentials: true });
+            setGradingExamList(response.data?.data ?? []);
+        } catch (error) {
+            console.log('Error fetching exam list for grading:', error);
+            setGradingExamList([]);
+        }
+    };
 
     const fetchStudentList = async () => {
         try {
@@ -279,15 +295,12 @@ function Admin() {
         try {
             setSelectedExamForSetup(examId);
             
-            // API 호출로 시험 상세 정보 가져오기
             const response = await axios.get(`${BASE_URL}/api/admin/exams/${examId}`, { withCredentials: true });
             const exam = response.data?.data;
             if (!exam) throw new Error('시험 데이터가 없습니다.');
             
-            // 시험 문제 저장
             setLoadedExamProblems(exam.problems ?? []);
             
-            // 각 문제의 저장된 제한 시간 설정
             const newTimeLimits = new Map<number, number>();
             const newInputValues = new Map<number, string>();
             
@@ -304,8 +317,6 @@ function Admin() {
             alert('시험을 불러오는 중 오류가 발생했습니다.');
         }
     };
-
-
 
     // 카테고리 관리 - 데이터 불러오기
     useEffect(() => {
@@ -369,7 +380,6 @@ function Admin() {
             let problemsList: ExamProblem[] = [];
 
             if (examProblemIds.length > 0) {
-                // Newly selected problems
                 problemsList = examProblemIds.map((id, index) => {
                     const detail = examProblemsDetail.get(id);
                     return {
@@ -388,7 +398,6 @@ function Admin() {
                     };
                 });
             } else if (loadedExamProblems.length > 0) {
-                // Editing existing exam with loaded problems
                 problemsList = loadedExamProblems;
             }
 
@@ -438,6 +447,18 @@ function Admin() {
             console.log('Error loading exam:', error);
             alert("시험을 불러오는 중 오류가 발생했습니다.");
             setLoadedExamProblems([]);
+        }
+    };
+
+    // ✅ 성적 관리 탭용 시험 로드 (채점용 문제 저장)
+    const loadExamForGrading = async (examId: number) => {
+        try {
+            const response = await axios.get(`${BASE_URL}/api/admin/exams/${examId}`, { withCredentials: true });
+            const exam = response.data?.data;
+            if (!exam) throw new Error('시험 데이터가 없습니다.');
+            setGradingLoadedProblems(exam.problems ?? []);
+        } catch (error) {
+            console.error('채점용 시험 로드 실패:', error);
         }
     };
 
@@ -761,7 +782,6 @@ function Admin() {
         const [removed] = newProblems.splice(fromIndex, 1);
         newProblems.splice(toIndex, 0, removed);
         
-        // 순서 번호(problemOrder) 재정렬
         const reordered = newProblems.map((p, idx) => ({
             ...p,
             problemOrder: idx + 1
@@ -774,7 +794,6 @@ function Admin() {
     const removeLoadedExamProblem = (index: number) => {
         const newProblems = loadedExamProblems.filter((_, i) => i !== index);
         
-        // 순서 번호(problemOrder) 재정렬
         const reordered = newProblems.map((p, idx) => ({
             ...p,
             problemOrder: idx + 1
@@ -822,7 +841,6 @@ function Admin() {
         });
     };
 
-    // ✅ 수정: \\int를 \\in 앞으로 이동
     const wrapWithDollarSigns = (text: string) => {
         if (!text) return "";
         const mathRegex = /(\\frac{[^{}]*(?:{[^{}]*}[^{}]*)*}{[^{}]*(?:{[^{}]*}[^{}]*)*}+|\\sqrt{[^{}]*(?:{[^{}]*}[^{}]*)*}+|\\sum_{.*?}^{.*?}|\\lim_{.*?}|\\int|\\log|\\ln|\\sin|\\cos|\\tan|\\theta|\\pi|\\times|\\div|\\pm|\\neq|\\le|\\ge|\\approx|\\infty|\\to|\\in|\\subset|\\cup|\\cap|\\angle|\\triangle|\\perp|\\parallel|\\therefore|\\because|\^{.*?}|_{.*?})/g;
@@ -878,7 +896,6 @@ function Admin() {
         }, 0);
     };
 
-    // ✅ 수정: \\int를 \\in 앞으로 이동
     const renderContent = (text: string) => {
         return text.split('\n').map((line, index) => {
             const processedLine = line.replace(/ /g, '\\ ');
@@ -1028,7 +1045,6 @@ function Admin() {
                     
                         {problemBankTab === 'list' && (
                             <div className="container mt-5">
-                                
                                 <div id="filter-box" className="rounded p-4 mb-4" style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}>
                                     <div className="row mb-3">
                                         <div className="col-3">
@@ -1084,7 +1100,6 @@ function Admin() {
                                     <>
                                         {!isEditing ? (
                                             <div id="problem-box" className="rounded p-4" style={{ boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)' }}>
-
                                                 <div className="d-flex justify-content-between align-items-center mb-3">
                                                     <div>
                                                         <span className="bg-primary-subtle text-primary fw-medium px-3 py-1 rounded-pill me-2">
@@ -1133,12 +1148,7 @@ function Admin() {
                                                         <img 
                                                             src={problem.imageUrl} 
                                                             alt="문제 이미지" 
-                                                            style={{ 
-                                                                maxWidth: '100%', 
-                                                                height: 'auto',
-                                                                borderRadius: '8px',
-                                                                border: '1px solid #ddd'
-                                                            }} 
+                                                            style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', border: '1px solid #ddd' }} 
                                                         />
                                                     </div>
                                                 )}
@@ -1205,18 +1215,8 @@ function Admin() {
                                                 </div>
 
                                                 <div className="d-flex gap-2">
-                                                    <button 
-                                                        className="btn btn-warning flex-fill" 
-                                                        onClick={handleEditProblem}
-                                                    >
-                                                        수정
-                                                    </button>
-                                                    <button 
-                                                        className="btn btn-danger flex-fill" 
-                                                        onClick={deleteProblem}
-                                                    >
-                                                        삭제
-                                                    </button>
+                                                    <button className="btn btn-warning flex-fill" onClick={handleEditProblem}>수정</button>
+                                                    <button className="btn btn-danger flex-fill" onClick={deleteProblem}>삭제</button>
                                                 </div>
                                             </div>
                                         ) : (
@@ -1337,7 +1337,6 @@ function Admin() {
                                             </div>
                                         )}
                                     </>
-                                    
                                 ) : (
                                     <div className="text-center py-5 border rounded">
                                         조회된 문제가 없습니다.
@@ -1465,6 +1464,7 @@ function Admin() {
 
                 {active === '시험 관리' && (
                     <>
+                        {/* ✅ 변경: '채점 관리' 서브탭 제거 */}
                         <div className="d-flex mb-4 border-bottom">
                             <button
                                 className={`px-4 py-2 border-0 bg-transparent ${examManagementSubTab === 'create_edit' ? 'border-bottom border-primary border-3 fw-bold text-primary' : 'text-secondary'}`}
@@ -1478,211 +1478,10 @@ function Admin() {
                             >
                                 시험 설정
                             </button>
-                            <button
-                                className={`px-4 py-2 border-0 bg-transparent ${examManagementSubTab === 'grading' ? 'border-bottom border-primary border-3 fw-bold text-primary' : 'text-secondary'}`}
-                                onClick={() => {
-                                    setExamManagementSubTab('grading');
-                                    setSelectedExamForSetup(null);
-                                    setGradingSessionStats([]);
-                                    setSelectedGradingUser(null);
-                                }}
-                            >
-                                채점 관리
-                            </button>
                         </div>
-
-                        {examManagementSubTab === 'grading' && (
-                            <div className="row">
-                                {/* 왼쪽: 시험 및 세션 선택 */}
-                                <div className="col-md-3">
-                                    <div className="card shadow-sm mb-4">
-                                        <div className="card-header bg-dark text-white py-3 fw-bold">시험 선택</div>
-                                        <div className="card-body p-0" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                                            <div className="list-group list-group-flush">
-                                                {examList.map(exam => (
-                                                    <button 
-                                                        key={exam.id} 
-                                                        className={`list-group-item list-group-item-action ${selectedExamId === exam.id ? 'active' : ''}`}
-                                                        onClick={async () => {
-                                                            setSelectedExamId(exam.id);
-                                                            loadExam(exam.id); // 시험 내용(loadedExamProblems) 즉시 로드
-                                                            const res = await axios.get(`${BASE_URL}/api/admin/exams/${exam.id}/sessions`, { withCredentials: true });
-                                                            setExamSessions(res.data.data || []);
-                                                            setGradingSessionStats([]);
-                                                            setSelectedGradingUser(null);
-                                                            setSelectedSessionId('');
-                                                        }}
-                                                    >
-                                                        {exam.title}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    {selectedExamId && (
-                                        <div className="card shadow-sm">
-                                            <div className="card-header bg-secondary text-white py-3 fw-bold">시험 회차 선택</div>
-                                            <div className="card-body p-0" style={{ maxHeight: '250px', overflowY: 'auto' }}>
-                                                <div className="list-group list-group-flush">
-                                                    {examSessions.map((sid, idx) => {
-                                                        const examTitle = examList.find(e => e.id === selectedExamId)?.title || "시험";
-                                                        return (
-                                                            <button 
-                                                                key={sid} 
-                                                                className={`list-group-item list-group-item-action ${selectedSessionId === sid ? 'bg-light fw-bold' : ''}`}
-                                                                onClick={async () => {
-                                                                    setSelectedSessionId(sid);
-                                                                    const res = await axios.get(`${BASE_URL}/api/admin/exams/sessions/${sid}/stats`, { withCredentials: true });
-                                                                    setGradingSessionStats(res.data.data || []);
-                                                                    setSelectedGradingUser(null);
-                                                                }}
-                                                            >
-                                                                {examTitle} ({examSessions.length - idx}차시)
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* 중앙: 학생 목록 */}
-                                <div className="col-md-3">
-                                    <div className="card shadow-sm h-100">
-                                        <div className="card-header bg-primary text-white py-3 fw-bold">응시 학생 목록</div>
-                                        <div className="card-body p-0">
-                                            {gradingSessionStats.length > 0 ? (
-                                                <div className="list-group list-group-flush">
-                                                    {gradingSessionStats.map((stat, idx) => (
-                                                        <button 
-                                                            key={idx} 
-                                                            className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${selectedGradingUser?.userId === stat.userId ? 'active' : ''}`}
-                                                            onClick={() => setSelectedGradingUser({...stat, userIdx: idx})}
-                                                        >
-                                                            <span>{stat.userName}</span>
-                                                            <span className={`badge ${selectedGradingUser?.userId === stat.userId ? 'bg-white text-primary' : 'bg-primary'}`}>
-                                                                {stat.correctCount} / {stat.totalQuestions}
-                                                            </span>
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <div className="p-4 text-center text-muted">회차를 선택하면 학생 목록이 나타납니다.</div>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* 오른쪽: 상세 채점 및 시험 내용 영역 */}
-                                <div className="col-md-6">
-                                    {selectedExamId ? (
-                                        <div className="card shadow-sm">
-                                            <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center">
-                                                <h5 className="mb-0 fw-bold">
-                                                    {selectedGradingUser ? `[${selectedGradingUser.userName}] 채점 상세` : "시험 내용 및 정답 확인"}
-                                                </h5>
-                                                {selectedGradingUser && (
-                                                    <span className="text-muted small">응시: {new Date(selectedGradingUser.createdAt).toLocaleString()}</span>
-                                                )}
-                                            </div>
-                                            <div className="card-body" style={{ maxHeight: '750px', overflowY: 'auto' }}>
-                                                {loadedExamProblems.length > 0 ? (
-                                                    loadedExamProblems.sort((a,b) => a.problemOrder - b.problemOrder).map((p, pIdx) => {
-                                                        // 선택된 학생의 해당 문제 제출 정보 찾기
-                                                        const submission = selectedGradingUser?.submissions?.find((s: any) => s.problemOrder === p.problemOrder);
-                                                        
-                                                        return (
-                                                            <div key={pIdx} className={`card mb-4 border-2 ${submission ? (submission.isCorrect ? 'border-success' : 'border-danger') : 'border-secondary-subtle'}`}>
-                                                                <div className="card-header d-flex justify-content-between align-items-center py-2 bg-light">
-                                                                    <span className="fw-bold">문제 {p.problemOrder} ({p.type})</span>
-                                                                    {submission && (
-                                                                        <div className="btn-group">
-                                                                            <button 
-                                                                                className={`btn btn-sm ${submission.isCorrect ? 'btn-success' : 'btn-outline-success'}`}
-                                                                                onClick={() => handleUpdateGrade(submission.id, true, selectedGradingUser.userIdx, selectedGradingUser.submissions.indexOf(submission))}
-                                                                            >
-                                                                                정답
-                                                                            </button>
-                                                                            <button 
-                                                                                className={`btn btn-sm ${!submission.isCorrect ? 'btn-danger' : 'btn-outline-danger'}`}
-                                                                                onClick={() => handleUpdateGrade(submission.id, false, selectedGradingUser.userIdx, selectedGradingUser.submissions.indexOf(submission))}
-                                                                            >
-                                                                                오답
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
-                                                                </div>
-                                                                <div className="card-body">
-                                                                    {/* 문제 내용 (항상 표시) */}
-                                                                    <div className="mb-3 p-2 bg-light rounded small border">
-                                                                        <div className="fw-bold mb-1 text-secondary border-bottom pb-1">문제 내용</div>
-                                                                        <div>{renderProblemContent(p.content)}</div>
-                                                                        {p.imageUrl && (
-                                                                            <div className="mt-2 text-center">
-                                                                                <img src={p.imageUrl} alt="문제 이미지" className="img-fluid rounded" style={{maxWidth: '300px'}} />
-                                                                            </div>
-                                                                        )}
-                                                                        {p.type === '객관식' && p.options && (
-                                                                            <div className="mt-2 small">
-                                                                                {p.options.map((opt: any) => (
-                                                                                    <div key={opt.optionNumber} className="d-flex gap-2">
-                                                                                        <span className="fw-bold">{['①', '②', '③', '④', '⑤'][opt.optionNumber-1] || opt.optionNumber}</span>
-                                                                                        <div>{renderProblemContent(opt.content)}</div>
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-
-                                                                    <div className="row g-2">
-                                                                        {/* 시스템 정답 (항상 표시) */}
-                                                                        <div className={selectedGradingUser ? "col-md-6" : "col-12"}>
-                                                                            <div className="p-2 border rounded bg-white h-100">
-                                                                                <div className="small text-muted mb-1">시스템 정답 (DB)</div>
-                                                                                <div className="fs-5 fw-bold text-success">
-                                                                                    {p.type === '객관식' ? `${p.answer}번` : renderProblemContent(p.answer)}
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                        
-                                                                        {/* 학생 제출 답안 (학생 선택 시에만 표시) */}
-                                                                        {selectedGradingUser && (
-                                                                            <div className="col-md-6">
-                                                                                <div className="p-2 border rounded bg-white h-100">
-                                                                                    <div className="small text-muted mb-1">학생 제출 답안</div>
-                                                                                    <div className={`fs-5 fw-bold ${!submission?.submittedAnswer?.trim() ? 'text-danger' : 'text-primary'}`}>
-                                                                                        {!submission?.submittedAnswer?.trim() ? "미제출" : (p.type === '객관식' ? `${submission.submittedAnswer}번` : renderProblemContent(submission.submittedAnswer))}
-                                                                                    </div>
-                                                                                </div>
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })
-                                                ) : (
-                                                    <div className="text-center py-5">
-                                                        <div className="spinner-border text-primary mb-2"></div>
-                                                        <p>시험 내용을 불러오는 중입니다...</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="card shadow-sm border-0 py-5 text-center bg-white text-muted">
-                                            <h5>왼쪽에서 시험을 선택하여 채점을 시작하세요.</h5>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
 
                         {examManagementSubTab === 'create_edit' && (
                             <div className="row">
-                                {/* 왼쪽: 시험 작성 영역 */}
                                 <div className="col-md-8">
                                     <div className="card shadow-sm mb-4">
                                         <div className="card-header bg-white">
@@ -1722,9 +1521,7 @@ function Admin() {
                                     <div className="card shadow-sm">
                                         <div className="card-header bg-primary text-white">
                                             <h4 className="mb-0">
-                                                시험 문제 목록 ({loadedExamProblems.length > 0 ? 
-                                                    loadedExamProblems.length : 
-                                                    examProblemIds.length}개)
+                                                시험 문제 목록 ({loadedExamProblems.length > 0 ? loadedExamProblems.length : examProblemIds.length}개)
                                             </h4>
                                         </div>
                                         <div className="card-body">
@@ -1748,39 +1545,15 @@ function Admin() {
                                                                     <div className="d-flex justify-content-between align-items-start mb-2">
                                                                         <h5 className="fw-bold text-primary mb-0">문제 {index + 1}</h5>
                                                                         <div className="d-flex gap-1">
-                                                                            <button 
-                                                                                className="btn btn-sm btn-outline-secondary"
-                                                                                onClick={() => moveExamProblem(index, index - 1)}
-                                                                                disabled={index === 0}
-                                                                            >
-                                                                                <i className="bi bi-arrow-up"></i>
-                                                                            </button>
-                                                                            <button 
-                                                                                className="btn btn-sm btn-outline-secondary"
-                                                                                onClick={() => moveExamProblem(index, index + 1)}
-                                                                                disabled={index === examProblemIds.length - 1}
-                                                                            >
-                                                                                <i className="bi bi-arrow-down"></i>
-                                                                            </button>
-                                                                            <button 
-                                                                                className="btn btn-sm btn-danger ms-2"
-                                                                                onClick={() => removeFromExam(id)}
-                                                                            >
-                                                                                삭제
-                                                                            </button>
+                                                                            <button className="btn btn-sm btn-outline-secondary" onClick={() => moveExamProblem(index, index - 1)} disabled={index === 0}><i className="bi bi-arrow-up"></i></button>
+                                                                            <button className="btn btn-sm btn-outline-secondary" onClick={() => moveExamProblem(index, index + 1)} disabled={index === examProblemIds.length - 1}><i className="bi bi-arrow-down"></i></button>
+                                                                            <button className="btn btn-sm btn-danger ms-2" onClick={() => removeFromExam(id)}>삭제</button>
                                                                         </div>
                                                                     </div>
-                                                                    <div className="mb-3">
-                                                                        {renderProblemContent(p.content)}
-                                                                    </div>
+                                                                    <div className="mb-3">{renderProblemContent(p.content)}</div>
                                                                     {p.imageUrl && (
                                                                         <div className="mb-3 text-center">
-                                                                            <img 
-                                                                                src={p.imageUrl} 
-                                                                                alt="문제 이미지" 
-                                                                                className="img-fluid rounded border" 
-                                                                                style={{ maxHeight: '200px' }}
-                                                                            />
+                                                                            <img src={p.imageUrl} alt="문제 이미지" className="img-fluid rounded border" style={{ maxHeight: '200px' }} />
                                                                         </div>
                                                                     )}
                                                                     {p.type === '객관식' && p.options && (
@@ -1807,7 +1580,6 @@ function Admin() {
                                     </div>
                                 </div>
 
-                                {/* 오른쪽: 저장된 시험 목록 */}
                                 <div className="col-md-4">
                                     <div className="card shadow-sm" style={{ position: 'sticky', top: '20px' }}>
                                         <div className="card-header bg-success text-white">
@@ -1815,9 +1587,7 @@ function Admin() {
                                         </div>
                                         <div className="card-body" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                                             {(examList ?? []).length === 0 ? (
-                                                <div className="text-center py-4 text-muted">
-                                                    저장된 시험이 없습니다.
-                                                </div>
+                                                <div className="text-center py-4 text-muted">저장된 시험이 없습니다.</div>
                                             ) : (
                                                 <div className="list-group list-group-flush">
                                                     {(examList ?? []).map((exam) => (
@@ -1836,10 +1606,7 @@ function Admin() {
                                                                 </div>
                                                                 <button 
                                                                     className="btn btn-sm btn-outline-danger"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        deleteExam(exam.id);
-                                                                    }}
+                                                                    onClick={(e) => { e.stopPropagation(); deleteExam(exam.id); }}
                                                                 >
                                                                     삭제
                                                                 </button>
@@ -1856,7 +1623,6 @@ function Admin() {
 
                         {examManagementSubTab === 'setup_test' && (
                             <div className="row">
-                                {/* 왼쪽: 시험 선택 */}
                                 <div className="col-md-4">
                                     <div className="card shadow-sm">
                                         <div className="card-header bg-warning text-dark">
@@ -1864,9 +1630,7 @@ function Admin() {
                                         </div>
                                         <div className="card-body" style={{ maxHeight: '600px', overflowY: 'auto' }}>
                                             {(examList ?? []).length === 0 ? (
-                                                <div className="text-center py-4 text-muted">
-                                                    저장된 시험이 없습니다.
-                                                </div>
+                                                <div className="text-center py-4 text-muted">저장된 시험이 없습니다.</div>
                                             ) : (
                                                 <div className="list-group">
                                                     {(examList ?? []).map((exam) => (
@@ -1888,7 +1652,6 @@ function Admin() {
                                     </div>
                                 </div>
 
-                                {/* 오른쪽: 문제별 시간 설정 */}
                                 <div className="col-md-8">
                                     {selectedExamForSetup ? (
                                         <div className="card shadow-sm">
@@ -1897,26 +1660,19 @@ function Admin() {
                                             </div>
                                             <div className="card-body" style={{ maxHeight: '700px', overflowY: 'auto' }}>
                                                 <div className="d-flex gap-2 mb-3">
-                                                    <button 
-                                                        className="btn btn-success flex-grow-1 fw-bold fs-4" 
-                                                        style={{height:'60px'}}
-                                                        onClick={saveTimeLimits}
-                                                    >
+                                                    <button className="btn btn-success flex-grow-1 fw-bold fs-4" style={{height:'60px'}} onClick={saveTimeLimits}>
                                                         시간 설정 저장
                                                     </button>
                                                     <button 
                                                         className="btn btn-primary fw-bold fs-4" 
                                                         style={{height:'60px', width: '40%'}}
                                                         onClick={() => {
-                                                            // 제한 시간 검증 (최소 5초)
                                                             const invalidProblems = Array.from(problemTimeLimits.entries())
                                                                 .filter(([_, seconds]) => seconds < 5);
-                                                            
                                                             if (invalidProblems.length > 0) {
                                                                 alert(`문제 ${invalidProblems.map(([num]) => num).join(', ')}의 제한 시간이 5초 미만입니다.\n모든 문제는 최소 5초 이상이어야 합니다.`);
                                                                 return;
                                                             }
-                                                            
                                                             if (window.confirm("시험 대기방을 생성하시겠습니까?")) {
                                                                 navigate('/exam', { state: { examId: selectedExamForSetup, isHost: true } });
                                                             }
@@ -1938,44 +1694,18 @@ function Admin() {
                                                                         style={{ width: '100px' }}
                                                                         value={inputValues.get(problemNum) ?? problemTimeLimits.get(problemNum)?.toString() ?? ""}
                                                                         onWheel={(e) => e.currentTarget.blur()}
-                                                                        onKeyDown={(e) => {
-                                                                            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                                                                            e.preventDefault();
-                                                                            }
-                                                                        }}
+                                                                        onKeyDown={(e) => { if (e.key === 'ArrowUp' || e.key === 'ArrowDown') e.preventDefault(); }}
                                                                         onChange={(e) => {
                                                                             const value = e.target.value;
-
-                                                                            setInputValues(prev => {
-                                                                            const newMap = new Map(prev);
-                                                                            newMap.set(problemNum, value);
-                                                                            return newMap;
-                                                                            });
+                                                                            setInputValues(prev => { const m = new Map(prev); m.set(problemNum, value); return m; });
                                                                         }}
                                                                         onBlur={() => {
                                                                             const currentValue = inputValues.get(problemNum);
-
                                                                             if (!currentValue) {
-                                                                                setProblemTimeLimits(prev => {
-                                                                                    const newMap = new Map(prev);
-                                                                                    newMap.set(problemNum, 0);
-                                                                                    return newMap;
-                                                                                });
-
-                                                                                setInputValues(prev => {
-                                                                                    const newMap = new Map(prev);
-                                                                                    newMap.set(problemNum, "0");
-                                                                                    return newMap;
-                                                                                });
-
-                                                                                } else {
-                                                                                    const num = Number(currentValue);
-                                                                                    setProblemTimeLimits(prev => {
-                                                                                        const newMap = new Map(prev);
-                                                                                        newMap.set(problemNum, num);
-                                                                                        return newMap;
-                                                                                    }
-                                                                                );
+                                                                                setProblemTimeLimits(prev => { const m = new Map(prev); m.set(problemNum, 0); return m; });
+                                                                                setInputValues(prev => { const m = new Map(prev); m.set(problemNum, "0"); return m; });
+                                                                            } else {
+                                                                                setProblemTimeLimits(prev => { const m = new Map(prev); m.set(problemNum, Number(currentValue)); return m; });
                                                                             }
                                                                         }}
                                                                         placeholder="초"
@@ -1983,36 +1713,18 @@ function Admin() {
                                                                     <span className="fw-bold">초</span>
                                                                 </div>
                                                             </div>
-                                                            
                                                             {(() => {
-                                                                const problem = loadedExamProblems.find(p => p.problemOrder === problemNum);
-                                                                if (!problem) return <div className="text-muted">문제 내용을 불러올 수 없습니다.</div>;
-                                                                
-                                                                const renderMathContent = (text: string) => {
-                                                                    if (!text) return null;
-                                                                    const parts = text.split(/(\$[^$]+\$)/g);
-                                                                    return parts.map((part, idx) => {
-                                                                        if (part.startsWith('$') && part.endsWith('$')) {
-                                                                            const math = part.slice(1, -1);
-                                                                            return <InlineMath key={idx} math={math} />;
-                                                                        }
-                                                                        return <span key={idx}>{part}</span>;
-                                                                    });
-                                                                };
-                                                                
+                                                                const prob = loadedExamProblems.find(p => p.problemOrder === problemNum);
+                                                                if (!prob) return <div className="text-muted">문제 내용을 불러올 수 없습니다.</div>;
                                                                 return (
                                                                     <>
                                                                         <div className="mb-3">
-                                                                            <div className="p-3 bg-light rounded problem-content-wrapper" style={{ overflow: 'hidden' }}>
-                                                                                <div>{renderProblemContent(problem.content)}</div>
-                                                                                {problem.imageUrl && (
-                                                                                    <div className="mt-2">
-                                                                                        <img src={problem.imageUrl} alt="문제 이미지" className="img-fluid" style={{maxWidth: '80%'}} />
-                                                                                    </div>
-                                                                                )}
-                                                                                {problem.type === '객관식' && problem.options && (
+                                                                            <div className="p-3 bg-light rounded" style={{ overflow: 'hidden' }}>
+                                                                                <div>{renderProblemContent(prob.content)}</div>
+                                                                                {prob.imageUrl && <div className="mt-2"><img src={prob.imageUrl} alt="문제 이미지" className="img-fluid" style={{maxWidth: '80%'}} /></div>}
+                                                                                {prob.type === '객관식' && prob.options && (
                                                                                     <ul className="list-unstyled mt-2">
-                                                                                        {problem.options.map((opt, idx) => (
+                                                                                        {prob.options.map((opt, idx) => (
                                                                                             <li key={idx} className="d-flex align-items-start mb-1">
                                                                                                 <span className="fw-bold me-2" style={{ minWidth: '22px' }}>{['①', '②', '③', '④', '⑤'][opt.optionNumber-1] || opt.optionNumber}</span>
                                                                                                 <div className="flex-grow-1">{renderProblemContent(opt.content)}</div>
@@ -2022,12 +1734,11 @@ function Admin() {
                                                                                 )}
                                                                             </div>
                                                                         </div>
-                                                                        
                                                                         <div className="mb-3">
                                                                             <div className="fw-bold text-success mb-2">정답:</div>
                                                                             <div className="p-3 bg-success-subtle rounded">
                                                                                 <span className="fw-bold text-success fs-5">
-                                                                                    {problem.type === '객관식' ? problem.answer : renderProblemContent(problem.answer)}
+                                                                                    {prob.type === '객관식' ? prob.answer : renderProblemContent(prob.answer)}
                                                                                 </span>
                                                                             </div>
                                                                         </div>
@@ -2062,65 +1773,33 @@ function Admin() {
                                 </div>
                                 <div className="col">
                                     <div className="d-flex gap-1 justify-content-end flex-wrap">
-                                        {/* 이름 검색 */}
                                         <div style={{ width: '150px' }}>
-                                            <input 
-                                                type="text" 
-                                                className="form-control form-control-sm" 
-                                                placeholder="이름 검색..." 
-                                                value={studentNameFilter}
-                                                onChange={(e) => setStudentNameFilter(e.target.value)}
-                                                onKeyDown={(e) => e.key === 'Enter' && fetchStudentList()}
-                                            />
+                                            <input type="text" className="form-control form-control-sm" placeholder="이름 검색..." value={studentNameFilter} onChange={(e) => setStudentNameFilter(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && fetchStudentList()} />
                                         </div>
-                                        {/* 성별 필터 */}
                                         <div style={{ width: '90px' }}>
-                                            <select 
-                                                className="form-select form-select-sm"
-                                                value={studentGenderFilter}
-                                                onChange={(e) => { setStudentGenderFilter(e.target.value); setStudentPage(0); }}
-                                            >
+                                            <select className="form-select form-select-sm" value={studentGenderFilter} onChange={(e) => { setStudentGenderFilter(e.target.value); setStudentPage(0); }}>
                                                 <option value="">성별 전체</option>
                                                 <option value="MALE">남성</option>
                                                 <option value="FEMALE">여성</option>
                                             </select>
                                         </div>
-                                        {/* 학년 필터 */}
                                         <div style={{ width: '110px' }}>
-                                            <select 
-                                                className="form-select form-select-sm"
-                                                value={studentGradeFilter}
-                                                onChange={(e) => { setStudentGradeFilter(e.target.value); setStudentPage(0); }}
-                                            >
+                                            <select className="form-select form-select-sm" value={studentGradeFilter} onChange={(e) => { setStudentGradeFilter(e.target.value); setStudentPage(0); }}>
                                                 <option value="">학년 전체</option>
                                                 {GRADE_OPTIONS.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                                                 <option value="ADULT">성인</option>
                                             </select>
                                         </div>
-                                        {/* 정렬 방식 */}
                                         <div style={{ width: '140px' }}>
-                                            <select 
-                                                className="form-select form-select-sm"
-                                                value={`${studentSortBy}-${studentSortDir}`}
-                                                onChange={(e) => {
-                                                    const [by, dir] = e.target.value.split('-');
-                                                    setStudentSortBy(by);
-                                                    setStudentSortDir(dir);
-                                                }}
-                                            >
+                                            <select className="form-select form-select-sm" value={`${studentSortBy}-${studentSortDir}`} onChange={(e) => { const [by, dir] = e.target.value.split('-'); setStudentSortBy(by); setStudentSortDir(dir); }}>
                                                 <option value="createdAt-DESC">가입일 최신순</option>
                                                 <option value="createdAt-ASC">가입일 오래된순</option>
                                                 <option value="name-ASC">이름 오름차순</option>
                                                 <option value="name-DESC">이름 내림차순</option>
                                             </select>
                                         </div>
-                                        {/* 페이지 크기 */}
                                         <div style={{ width: '90px' }}>
-                                            <select 
-                                                className="form-select form-select-sm"
-                                                value={studentSize}
-                                                onChange={(e) => { setStudentSize(Number(e.target.value)); setStudentPage(0); }}
-                                            >
+                                            <select className="form-select form-select-sm" value={studentSize} onChange={(e) => { setStudentSize(Number(e.target.value)); setStudentPage(0); }}>
                                                 <option value="10">10개씩</option>
                                                 <option value="20">20개씩</option>
                                             </select>
@@ -2151,34 +1830,16 @@ function Admin() {
                                                 <tr key={student.id}>
                                                     <td className="px-4 py-3 text-muted">{student.id}</td>
                                                     <td className="px-4 py-3 fw-bold">{student.name}</td>
-                                                    <td className="px-4 py-3">
-                                                        {student.gender === 'MALE' ? '남' : student.gender === 'FEMALE' ? '여' : student.gender || '-'}
-                                                    </td>
+                                                    <td className="px-4 py-3">{student.gender === 'MALE' ? '남' : student.gender === 'FEMALE' ? '여' : student.gender || '-'}</td>
                                                     <td className="px-4 py-3">{student.username}</td>
-                                                    <td className="px-4 py-3 text-muted" style={{ wordBreak: 'break-all' }}>
-                                                        {student.email || '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <span className="badge bg-secondary-subtle text-secondary px-3 py-2">
-                                                            {GRADE_MAP[student.grade] || student.grade}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-muted small">
-                                                        {formatDate(student.createdAt)}
-                                                    </td>
-                                                    <td className="px-4 py-3">
-                                                        <span className="badge bg-info-subtle text-info px-3 py-2">
-                                                            {student.role}
-                                                        </span>
-                                                    </td>
+                                                    <td className="px-4 py-3 text-muted" style={{ wordBreak: 'break-all' }}>{student.email || '-'}</td>
+                                                    <td className="px-4 py-3"><span className="badge bg-secondary-subtle text-secondary px-3 py-2">{GRADE_MAP[student.grade] || student.grade}</span></td>
+                                                    <td className="px-4 py-3 text-muted small">{formatDate(student.createdAt)}</td>
+                                                    <td className="px-4 py-3"><span className="badge bg-info-subtle text-info px-3 py-2">{student.role}</span></td>
                                                 </tr>
                                             ))
                                         ) : (
-                                            <tr>
-                                                <td colSpan={8} className="text-center py-5 text-muted">
-                                                    등록된 학생 정보가 없습니다.
-                                                </td>
-                                            </tr>
+                                            <tr><td colSpan={8} className="text-center py-5 text-muted">등록된 학생 정보가 없습니다.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -2187,54 +1848,221 @@ function Admin() {
                         {studentTotalPages > 1 && (
                             <div className="card-footer bg-white py-3">
                                 <div className="d-flex justify-content-center align-items-center gap-1">
-                                    {/* 이전 버튼 */}
-                                    <button 
-                                        className="btn btn-sm btn-outline-secondary me-2" 
-                                        disabled={studentPage === 0}
-                                        onClick={() => setStudentPage(studentPage - 1)}
-                                    >
+                                    <button className="btn btn-sm btn-outline-secondary me-2" disabled={studentPage === 0} onClick={() => setStudentPage(studentPage - 1)}>
                                         <i className="bi bi-chevron-left"></i>
                                     </button>
-
-                                    {/* 페이지 번호 목록 */}
                                     {(() => {
                                         const pages = [];
                                         let start = Math.max(0, studentPage - 4);
                                         let end = Math.min(studentTotalPages - 1, studentPage + 4);
-
-                                        // 좌우 균형 맞추기 (총 9개가 안될 경우 확장)
-                                        if (studentPage < 4) {
-                                            end = Math.min(8, studentTotalPages - 1);
-                                        } else if (studentPage > studentTotalPages - 5) {
-                                            start = Math.max(0, studentTotalPages - 9);
-                                        }
-
+                                        if (studentPage < 4) end = Math.min(8, studentTotalPages - 1);
+                                        else if (studentPage > studentTotalPages - 5) start = Math.max(0, studentTotalPages - 9);
                                         for (let i = start; i <= end; i++) {
                                             pages.push(
-                                                <button
-                                                    key={i}
-                                                    className={`btn btn-sm ${studentPage === i ? 'btn-primary' : 'btn-outline-primary'} mx-1`}
-                                                    style={{ minWidth: '35px' }}
-                                                    onClick={() => setStudentPage(i)}
-                                                >
+                                                <button key={i} className={`btn btn-sm ${studentPage === i ? 'btn-primary' : 'btn-outline-primary'} mx-1`} style={{ minWidth: '35px' }} onClick={() => setStudentPage(i)}>
                                                     {i + 1}
                                                 </button>
                                             );
                                         }
                                         return pages;
                                     })()}
-
-                                    {/* 다음 버튼 */}
-                                    <button 
-                                        className="btn btn-sm btn-outline-secondary ms-2" 
-                                        disabled={studentPage + 1 >= studentTotalPages}
-                                        onClick={() => setStudentPage(studentPage + 1)}
-                                    >
+                                    <button className="btn btn-sm btn-outline-secondary ms-2" disabled={studentPage + 1 >= studentTotalPages} onClick={() => setStudentPage(studentPage + 1)}>
                                         <i className="bi bi-chevron-right"></i>
                                     </button>
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* ✅ 성적 관리 탭 - 채점 관리 기능 이동 */}
+                {active === '성적 관리' && (
+                    <div className="row">
+                        {/* 왼쪽: 시험 및 세션 선택 */}
+                        <div className="col-md-3">
+                            <div className="card shadow-sm mb-4">
+                                <div className="card-header bg-dark text-white py-3 fw-bold">시험 선택</div>
+                                <div className="card-body p-0" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                                    <div className="list-group list-group-flush">
+                                        {gradingExamList.map(exam => (
+                                            <button
+                                                key={exam.id}
+                                                className={`list-group-item list-group-item-action ${gradingSelectedExamId === exam.id ? 'active' : ''}`}
+                                                onClick={async () => {
+                                                    setGradingSelectedExamId(exam.id);
+                                                    loadExamForGrading(exam.id);
+                                                    const res = await axios.get(`${BASE_URL}/api/admin/exams/${exam.id}/sessions`, { withCredentials: true });
+                                                    setGradingExamSessions(res.data.data || []);
+                                                    setGradingSessionStats([]);
+                                                    setSelectedGradingUser(null);
+                                                    setGradingSelectedSessionId('');
+                                                }}
+                                            >
+                                                {exam.title}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {gradingSelectedExamId && (
+                                <div className="card shadow-sm">
+                                    <div className="card-header bg-secondary text-white py-3 fw-bold">시험 회차 선택</div>
+                                    <div className="card-body p-0" style={{ maxHeight: '250px', overflowY: 'auto' }}>
+                                        <div className="list-group list-group-flush">
+                                            {gradingExamSessions.map((sid, idx) => {
+                                                const examTitle = gradingExamList.find(e => e.id === gradingSelectedExamId)?.title || "시험";
+                                                return (
+                                                    <button
+                                                        key={sid}
+                                                        className={`list-group-item list-group-item-action ${gradingSelectedSessionId === sid ? 'bg-light fw-bold' : ''}`}
+                                                        onClick={async () => {
+                                                            setGradingSelectedSessionId(sid);
+                                                            const res = await axios.get(`${BASE_URL}/api/admin/exams/sessions/${sid}/stats`, { withCredentials: true });
+                                                            setGradingSessionStats(res.data.data || []);
+                                                            setSelectedGradingUser(null);
+                                                        }}
+                                                    >
+                                                        {examTitle} ({gradingExamSessions.length - idx}차시)
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* 중앙: 학생 목록 */}
+                        <div className="col-md-3">
+                            <div className="card shadow-sm h-100">
+                                <div className="card-header bg-primary text-white py-3 fw-bold">응시 학생 목록</div>
+                                <div className="card-body p-0">
+                                    {gradingSessionStats.length > 0 ? (
+                                        <div className="list-group list-group-flush">
+                                            {gradingSessionStats.map((stat, idx) => (
+                                                <button
+                                                    key={idx}
+                                                    className={`list-group-item list-group-item-action d-flex justify-content-between align-items-center ${selectedGradingUser?.userId === stat.userId ? 'active' : ''}`}
+                                                    onClick={() => setSelectedGradingUser({...stat, userIdx: idx})}
+                                                >
+                                                    <span>{stat.userName}</span>
+                                                    <span className={`badge ${selectedGradingUser?.userId === stat.userId ? 'bg-white text-primary' : 'bg-primary'}`}>
+                                                        {stat.correctCount} / {stat.totalQuestions}
+                                                    </span>
+                                                </button>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="p-4 text-center text-muted">회차를 선택하면 학생 목록이 나타납니다.</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 오른쪽: 상세 채점 및 시험 내용 */}
+                        <div className="col-md-6">
+                            {gradingSelectedExamId ? (
+                                <div className="card shadow-sm">
+                                    <div className="card-header bg-white py-3 d-flex justify-content-between align-items-center">
+                                        <h5 className="mb-0 fw-bold">
+                                            {selectedGradingUser ? `[${selectedGradingUser.userName}] 채점 상세` : "시험 내용 및 정답 확인"}
+                                        </h5>
+                                        {selectedGradingUser && (
+                                            <span className="text-muted small">응시: {new Date(selectedGradingUser.createdAt).toLocaleString()}</span>
+                                        )}
+                                    </div>
+                                    <div className="card-body" style={{ maxHeight: '750px', overflowY: 'auto' }}>
+                                        {gradingLoadedProblems.length > 0 ? (
+                                            gradingLoadedProblems.sort((a, b) => a.problemOrder - b.problemOrder).map((p, pIdx) => {
+                                                const submission = selectedGradingUser?.submissions?.find((s: any) => s.problemOrder === p.problemOrder);
+                                                return (
+                                                    <div key={pIdx} className={`card mb-4 border-2 ${submission ? (submission.isCorrect ? 'border-success' : 'border-danger') : 'border-secondary-subtle'}`}>
+                                                        <div className="card-header d-flex justify-content-between align-items-center py-2 bg-light">
+                                                            <span className="fw-bold">문제 {p.problemOrder} ({p.type})</span>
+                                                            {submission && (
+                                                                <div className="btn-group">
+                                                                    <button
+                                                                        className={`btn btn-sm ${submission.isCorrect ? 'btn-success' : 'btn-outline-success'}`}
+                                                                        onClick={() => handleUpdateGrade(submission.id, true, selectedGradingUser.userIdx, selectedGradingUser.submissions.indexOf(submission))}
+                                                                    >
+                                                                        정답
+                                                                    </button>
+                                                                    <button
+                                                                        className={`btn btn-sm ${!submission.isCorrect ? 'btn-danger' : 'btn-outline-danger'}`}
+                                                                        onClick={() => handleUpdateGrade(submission.id, false, selectedGradingUser.userIdx, selectedGradingUser.submissions.indexOf(submission))}
+                                                                    >
+                                                                        오답
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="card-body">
+                                                            {/* 문제 내용 */}
+                                                            <div className="mb-3 p-2 bg-light rounded small border">
+                                                                <div className="fw-bold mb-1 text-secondary border-bottom pb-1">문제 내용</div>
+                                                                <div>{renderProblemContent(p.content)}</div>
+                                                                {p.imageUrl && (
+                                                                    <div className="mt-2 text-center">
+                                                                        <img src={p.imageUrl} alt="문제 이미지" className="img-fluid rounded" style={{maxWidth: '300px'}} />
+                                                                    </div>
+                                                                )}
+                                                                {p.type === '객관식' && p.options && (
+                                                                    <div className="mt-2 small">
+                                                                        {p.options.map((opt: any) => (
+                                                                            <div key={opt.optionNumber} className="d-flex gap-2">
+                                                                                <span className="fw-bold">{['①', '②', '③', '④', '⑤'][opt.optionNumber-1] || opt.optionNumber}</span>
+                                                                                <div>{renderProblemContent(opt.content)}</div>
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                            </div>
+
+                                                            <div className="row g-2">
+                                                                {/* 정답 */}
+                                                                <div className={selectedGradingUser ? "col-md-6" : "col-12"}>
+                                                                    <div className="p-2 border rounded bg-white h-100">
+                                                                        <div className="small text-muted mb-1">시스템 정답 (DB)</div>
+                                                                        <div className="fs-5 fw-bold text-success">
+                                                                            {p.type === '객관식' ? `${p.answer}번` : renderProblemContent(p.answer)}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+
+                                                                {/* 학생 제출 답안 */}
+                                                                {selectedGradingUser && (
+                                                                    <div className="col-md-6">
+                                                                        <div className="p-2 border rounded bg-white h-100">
+                                                                            <div className="small text-muted mb-1">학생 제출 답안</div>
+                                                                            <div className={`fs-5 fw-bold ${!submission?.submittedAnswer?.trim() ? 'text-danger' : 'text-primary'}`}>
+                                                                                {!submission?.submittedAnswer?.trim()
+                                                                                    ? "미제출"
+                                                                                    : (p.type === '객관식' ? `${submission.submittedAnswer}번` : renderProblemContent(submission.submittedAnswer))
+                                                                                }
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            <div className="text-center py-5">
+                                                <div className="spinner-border text-primary mb-2"></div>
+                                                <p>시험 내용을 불러오는 중입니다...</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="card shadow-sm border-0 py-5 text-center bg-white text-muted">
+                                    <h5>왼쪽에서 시험을 선택하여 채점을 시작하세요.</h5>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
