@@ -1,4 +1,4 @@
-import mainBanner from '../assets/images/mainbanner.png';
+import mainBanner from '../assets/images/main/mainbanner.png';
 
 function MainPage() {
     return (

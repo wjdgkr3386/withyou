@@ -1,9 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import mainbanner from '../assets/images/mainbanner.png';
-import teacherImage from '../assets/images/teacher.png';
-import class01 from '../assets/images/class01.png';
-import class02 from '../assets/images/class02.png';
-import class03 from '../assets/images/class03.png';
+import teacherImage from '../assets/images/about/teacher.png';
+import class01 from '../assets/images/about/class01.png';
+import class02 from '../assets/images/about/class02.png';
+import class03 from '../assets/images/about/class03.png';
 
 declare global {
   interface Window {
