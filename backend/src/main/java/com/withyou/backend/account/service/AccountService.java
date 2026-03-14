@@ -28,24 +28,29 @@ public class AccountService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final SolapiService solapiService;
+    private final org.springframework.mail.javamail.JavaMailSender mailSender;
     private final RedisTemplate<String, String> redisTemplate;
     private final Util util;
 
     // Redis 키 접두사 상수화
-    private static final String SIGNUP_PREFIX = "auth:signup:";
-    private static final String VERIFIED_PREFIX = "verified:signup:";
+    private static final String SIGNUP_PHONE_PREFIX = "auth:signup:phone:";
+    private static final String VERIFIED_PHONE_PREFIX = "verified:signup:phone:";
+    private static final String SIGNUP_EMAIL_PREFIX = "auth:signup:email:";
+    private static final String VERIFIED_EMAIL_PREFIX = "verified:signup:email:";
     private static final String FIND_PW_PREFIX = "auth:findPw:";
 
     public AccountService(UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
                           JwtTokenProvider jwtTokenProvider,
                           SolapiService solapiService,
+                          org.springframework.mail.javamail.JavaMailSender mailSender,
                           RedisTemplate<String, String> redisTemplate,
                           Util util) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.solapiService = solapiService;
+        this.mailSender = mailSender;
         this.redisTemplate = redisTemplate;
         this.util = util;
     }
@@ -81,11 +86,18 @@ public class AccountService {
     // 회원가입
     // ===================
     public void signup(SignupDTO signupDTO) {
-        String verifiedKey = VERIFIED_PREFIX + signupDTO.getPhone();
-        String isVerified = redisTemplate.opsForValue().get(verifiedKey);
+        String verifiedPhoneKey = VERIFIED_PHONE_PREFIX + signupDTO.getPhone();
+        String verifiedEmailKey = VERIFIED_EMAIL_PREFIX + signupDTO.getEmail();
 
-        if (isVerified == null) {
+        String isPhoneVerified = redisTemplate.opsForValue().get(verifiedPhoneKey);
+        String isEmailVerified = redisTemplate.opsForValue().get(verifiedEmailKey);
+
+        if (isPhoneVerified == null) {
             throw new CustomException("전화번호 인증이 완료되지 않았거나 만료되었습니다.");
+        }
+
+        if (isEmailVerified == null) {
+            throw new CustomException("이메일 인증이 완료되지 않았거나 만료되었습니다.");
         }
 
         if (userRepository.existsByUsername(signupDTO.getUsername())) {
@@ -94,6 +106,10 @@ public class AccountService {
 
         if (userRepository.existsByPhone(signupDTO.getPhone())) {
             throw new CustomException("이미 등록된 전화번호입니다.");
+        }
+
+        if (userRepository.existsByEmail(signupDTO.getEmail())) {
+            throw new CustomException("이미 등록된 이메일입니다.");
         }
 
         User user = new User(
@@ -111,35 +127,72 @@ public class AccountService {
             userRepository.save(user);
         }catch(Exception e){
             System.out.println(e);
+            throw new CustomException("회원가입 처리 중 오류가 발생했습니다.");
         }
-        redisTemplate.delete(verifiedKey);
+        redisTemplate.delete(verifiedPhoneKey);
+        redisTemplate.delete(verifiedEmailKey);
     }
 
     // ===================
-    // 회원가입 시 인증번호 발송
+    // 회원가입 시 전화번호 인증번호 발송
     // ===================
     public void sendSignupCode(String phone) {
         String code = util.randomDigitCode(6);
-        // 회원가입 전용 키 사용
-        redisTemplate.opsForValue().set(SIGNUP_PREFIX + phone, code, 5, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(SIGNUP_PHONE_PREFIX + phone, code, 5, TimeUnit.MINUTES);
 
         boolean result = solapiService.sendVerificationSms(phone, "[위드유] 회원가입 인증번호: [" + code + "]");
         if (!result) throw new CustomException("인증번호 발송 실패");
     }
 
     // ===================
-    // 회원가입 시 인증번호 검증
+    // 회원가입 시 전화번호 인증번호 검증
     // ===================
     public void verifySignupCode(String phone, String code) {
-        String key = SIGNUP_PREFIX + phone;
+        String key = SIGNUP_PHONE_PREFIX + phone;
         String savedCode = redisTemplate.opsForValue().get(key);
 
         if (savedCode == null) throw new CustomException("인증 시간이 만료되었습니다.");
         if (!savedCode.equals(code)) throw new CustomException("인증번호가 일치하지 않습니다.");
 
-        redisTemplate.opsForValue().set(VERIFIED_PREFIX + phone, "true", 10, TimeUnit.MINUTES);
+        redisTemplate.opsForValue().set(VERIFIED_PHONE_PREFIX + phone, "true", 10, TimeUnit.MINUTES);
+        redisTemplate.delete(key);
+    }
 
-        redisTemplate.delete(key); // 검증 성공 시 삭제
+    // ===================
+    // 회원가입 시 이메일 인증번호 발송
+    // ===================
+    public void sendEmailCode(String email) {
+        if (userRepository.existsByEmail(email)) {
+            throw new CustomException("이미 사용 중인 이메일입니다.");
+        }
+
+        String code = util.randomDigitCode(6);
+        redisTemplate.opsForValue().set(SIGNUP_EMAIL_PREFIX + email, code, 5, TimeUnit.MINUTES);
+
+        try {
+            org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            message.setTo(email);
+            message.setSubject("[위드유] 회원가입 이메일 인증번호");
+            message.setText("안녕하세요. 위드유입니다.\n\n회원가입 인증번호는 [" + code + "] 입니다.\n5분 이내에 입력해 주세요.");
+            mailSender.send(message);
+        } catch (Exception e) {
+            System.out.println("이메일 발송 오류: " + e.getMessage());
+            throw new CustomException("이메일 발송에 실패했습니다.");
+        }
+    }
+
+    // ===================
+    // 회원가입 시 이메일 인증번호 검증
+    // ===================
+    public void verifyEmailCode(String email, String code) {
+        String key = SIGNUP_EMAIL_PREFIX + email;
+        String savedCode = redisTemplate.opsForValue().get(key);
+
+        if (savedCode == null) throw new CustomException("인증 시간이 만료되었습니다.");
+        if (!savedCode.equals(code)) throw new CustomException("인증번호가 일치하지 않습니다.");
+
+        redisTemplate.opsForValue().set(VERIFIED_EMAIL_PREFIX + email, "true", 10, TimeUnit.MINUTES);
+        redisTemplate.delete(key);
     }
 
     // ===================

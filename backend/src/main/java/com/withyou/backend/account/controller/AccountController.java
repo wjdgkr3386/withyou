@@ -35,18 +35,33 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponse.success("회원가입 성공", null));
     }
 
-    // 회원가입용 인증번호 발송
+    // 회원가입용 전화번호 인증번호 발송
     @PostMapping("/sms/send")
-    public ResponseEntity<ApiResponse<Void>> sendSignupCode(@RequestBody FindDTO request) {
+    public ResponseEntity<ApiResponse<Void>> sendSignupCode(@RequestBody SignupDTO request) {
         accountService.sendSignupCode(request.getPhone());
         return ResponseEntity.ok(ApiResponse.success("회원가입 인증번호 발송 성공", null));
     }
 
-    // 회원가입용 인증번호 검증
+    // 회원가입용 전화번호 인증번호 검증
     @PostMapping("/sms/verify")
     public ResponseEntity<ApiResponse<Void>> verifySignupCode(@RequestBody SignupDTO request) {
         accountService.verifySignupCode(request.getPhone(), request.getVerificationCode());
-        return ResponseEntity.ok(ApiResponse.success("인증 성공", null));
+        return ResponseEntity.ok(ApiResponse.success("전화번호 인증 성공", null));
+    }
+
+    // 회원가입용 이메일 인증번호 발송
+    @PostMapping("/email/send")
+    public ResponseEntity<ApiResponse<Void>> sendEmailCode(@RequestBody SignupDTO request) {
+        System.out.println("AccountController - sendEmailCode");
+        accountService.sendEmailCode(request.getEmail());
+        return ResponseEntity.ok(ApiResponse.success("이메일 인증번호 발송 성공", null));
+    }
+
+    // 회원가입용 이메일 인증번호 검증
+    @PostMapping("/email/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyEmailCode(@RequestBody SignupDTO request) {
+        accountService.verifyEmailCode(request.getEmail(), request.getVerificationCode());
+        return ResponseEntity.ok(ApiResponse.success("이메일 인증 성공", null));
     }
 
     // =========================================================

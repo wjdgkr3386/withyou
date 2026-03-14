@@ -89,7 +89,9 @@ public class SecurityConfig {
                                 "/api/find/password",
                                 "/api/send-verification",
                                 "/api/notice/list",
-                                "/api/notice/detail/**"
+                                "/api/notice/detail/**",
+                                "/api/email/send",
+                                "/api/email/verify"
                         ).permitAll()
 
                         // 로그인 사용자 전용

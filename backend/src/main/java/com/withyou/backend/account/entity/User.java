@@ -27,7 +27,7 @@ public class User extends com.withyou.backend.common.entity.BaseEntity {
     @Column(length = 11, nullable = false, unique = true, comment = "전화번호")
     private String phone;
 
-    @Column(length = 50, unique = true, comment = "이메일")
+    @Column(length = 50, nullable = false, unique = true, comment = "이메일")
     private String email;
 
     @Column(length = 10, nullable = false, comment = "생년월일")

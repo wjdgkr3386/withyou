@@ -89,7 +89,7 @@ interface Student {
 
 function Admin() {
     const navigate = useNavigate();
-    const [active, setActive] = useState<string>('대시보드');
+    const [active, setActive] = useState<string>('카테고리 관리');
     const [problemBankTab, setProblemBankTab] = useState<'list' | 'create'>('list');
     const [selectedGrade, setSelectedGrade] = useState<string>('초5');
     const [selectedTerm, setSelectedTerm] = useState<string>('1학기');
@@ -100,7 +100,7 @@ function Admin() {
 
     const [data, setData] = useState<CategoryData>({});
 
-    const menus = ['대시보드', '카테고리 관리', '문제은행', '시험 관리', '학생 관리', '성적 관리'];
+    const menus = ['카테고리 관리', '문제은행', '시험 관리', '학생 관리', '성적 관리'];
     const grades = GRADE_OPTIONS.map(g => g.label);
 
     const currentKey = `${selectedGrade}-${selectedTerm}`;
