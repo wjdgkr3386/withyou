@@ -17,10 +17,11 @@ function AccountFindPage() {
     const [findPwForm, setFindPwForm] = useState({
         name: '',
         username: '',
-        phone: '',
+        email: '',
         verificationCode: ''
     });
     const [isVerificationSent, setIsVerificationSent] = useState(false);
+    const [isEmailVerified, setIsEmailVerified] = useState(false);
 
     // 아이디 찾기 핸들러
     const handleFindId = async () => {
@@ -42,42 +43,67 @@ function AccountFindPage() {
             }
         } catch (error) {
             const err = error as AxiosError<{ message: string }>;
-            alert(err.response?.data?.message || "아이디 찾기 중 오류가 발생했습니다.");   
+            alert(err.response?.data?.message || "아이디 찾기 중 오류가 발생했습니다.");
         }
     };
 
-    // 인증번호 요청 핸들러
-    const handleRequestVerification = async () => {
-        if (!findPwForm.phone) {
-            alert('휴대폰 번호를 입력해주세요.');
+    // 이메일 인증번호 요청
+    const handleRequestEmailVerification = async () => {
+        if (!findPwForm.email) {
+            alert('이메일을 입력해주세요.');
             return;
         }
 
         try {
-            const response = await axios.post(`${BASE_URL}/api/send-verification`, {
-                phone: findPwForm.phone
+            const response = await axios.post(`${BASE_URL}/api/find/password/email/send`, {
+                email: findPwForm.email
             });
 
             if (response.data.success) {
                 setIsVerificationSent(true);
-                alert('인증번호가 발송되었습니다.');
+                alert('인증번호가 이메일로 발송되었습니다.');
             } else {
                 alert(response.data.message || '인증번호 발송에 실패했습니다.');
             }
         } catch (error) {
             const err = error as AxiosError<{ message: string }>;
-            if (err.response?.status === 429) {
-                alert("인증번호 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
+            alert(err.response?.data?.message || "인증번호 발송 중 오류가 발생했습니다.");
+        }
+    };
+
+    // 이메일 인증번호 확인
+    const handleVerifyEmailCode = async () => {
+        if (!findPwForm.verificationCode) {
+            alert('인증번호를 입력해주세요.');
+            return;
+        }
+
+        try {
+            const response = await axios.post(`${BASE_URL}/api/find/password/email/verify`, {
+                email: findPwForm.email,
+                verificationCode: findPwForm.verificationCode
+            });
+
+            if (response.data.success) {
+                setIsEmailVerified(true);
+                alert('이메일 인증이 완료되었습니다.');
             } else {
-                alert(err.response?.data?.message || "인증번호 발송 중 오류가 발생했습니다.");
+                alert(response.data.message || '인증번호가 올바르지 않습니다.');
             }
+        } catch (error) {
+            const err = error as AxiosError<{ message: string }>;
+            alert(err.response?.data?.message || "인증 확인 중 오류가 발생했습니다.");
         }
     };
 
     // 비밀번호 찾기 핸들러
     const handleFindPassword = async () => {
-        if (!findPwForm.name || !findPwForm.username || !findPwForm.phone || !findPwForm.verificationCode) {
+        if (!findPwForm.name || !findPwForm.username || !findPwForm.email) {
             alert('모든 항목을 입력해주세요.');
+            return;
+        }
+        if (!isEmailVerified) {
+            alert('이메일 인증을 완료해주세요.');
             return;
         }
 
@@ -85,12 +111,11 @@ function AccountFindPage() {
             const response = await axios.post(`${BASE_URL}/api/find/password`, {
                 name: findPwForm.name,
                 username: findPwForm.username,
-                phone: findPwForm.phone,
-                verificationCode: findPwForm.verificationCode
+                email: findPwForm.email
             });
 
             if (response.data.success) {
-                alert('임시 비밀번호가 발송되었습니다. 로그인 후 비밀번호를 변경해주세요.');
+                alert('임시 비밀번호가 이메일로 발송되었습니다. 로그인 후 비밀번호를 변경해주세요.');
                 navigate('/login');
             } else {
                 alert(response.data.message || '비밀번호 찾기에 실패했습니다.');
@@ -108,7 +133,7 @@ function AccountFindPage() {
                 <h3 className="text-center fw-bold mb-4">계정 찾기</h3>
 
                 <div className="row g-4">
-                    
+
                     {/* ================= 아이디 찾기 카드 ================= */}
                     <div className="col-12 col-md-6">
                         <div className="card shadow-lg p-4 rounded-4 h-100">
@@ -142,7 +167,7 @@ function AccountFindPage() {
                                 </div>
                             )}
 
-                            <button 
+                            <button
                                 className="btn btn-primary w-100 mt-auto"
                                 onClick={handleFindId}
                             >
@@ -179,39 +204,57 @@ function AccountFindPage() {
                             </div>
 
                             <div className="mb-3">
-                                <label className="form-label">휴대폰 번호</label>
+                                <label className="form-label">이메일</label>
                                 <div className="d-flex gap-2">
                                     <input
-                                        type="text"
+                                        type="email"
                                         className="form-control"
-                                        placeholder="01012345678"
-                                        value={findPwForm.phone}
-                                        onChange={(e) => setFindPwForm({...findPwForm, phone: e.target.value})}
+                                        placeholder="이메일 입력"
+                                        value={findPwForm.email}
+                                        onChange={(e) => setFindPwForm({...findPwForm, email: e.target.value})}
+                                        readOnly={isEmailVerified}
                                     />
-                                    <button 
+                                    <button
                                         className="btn btn-outline-primary text-nowrap"
-                                        onClick={handleRequestVerification}
+                                        onClick={handleRequestEmailVerification}
+                                        disabled={isEmailVerified}
                                     >
                                         인증요청
                                     </button>
                                 </div>
                             </div>
 
-                            <div className="mb-4">
-                                <label className="form-label">인증번호</label>
-                                <input
-                                    type="text"
-                                    className="form-control"
-                                    placeholder="인증번호 입력"
-                                    value={findPwForm.verificationCode}
-                                    onChange={(e) => setFindPwForm({...findPwForm, verificationCode: e.target.value})}
-                                    disabled={!isVerificationSent}
-                                />
-                            </div>
+                            {isVerificationSent && (
+                                <div className="mb-4">
+                                    <label className="form-label">인증번호</label>
+                                    <div className="d-flex gap-2">
+                                        <input
+                                            type="text"
+                                            className="form-control"
+                                            placeholder="인증번호 입력"
+                                            value={findPwForm.verificationCode}
+                                            onChange={(e) => setFindPwForm({...findPwForm, verificationCode: e.target.value})}
+                                            disabled={isEmailVerified}
+                                        />
+                                        <button
+                                            className="btn btn-outline-success text-nowrap"
+                                            onClick={handleVerifyEmailCode}
+                                            disabled={isEmailVerified}
+                                        >
+                                            확인
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
-                            <button 
+                            {isEmailVerified && (
+                                <div className="text-success small mb-3">✔ 이메일 인증이 완료되었습니다.</div>
+                            )}
+
+                            <button
                                 className="btn btn-primary w-100 mt-auto"
                                 onClick={handleFindPassword}
+                                disabled={!isEmailVerified}
                             >
                                 비밀번호 찾기
                             </button>

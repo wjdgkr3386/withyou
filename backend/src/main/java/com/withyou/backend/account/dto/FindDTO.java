@@ -11,6 +11,7 @@ import lombok.Setter;
 @AllArgsConstructor
 public class FindDTO {
     private String name;
+    private String email;
     private String phone;
     private String username;
     private String verificationCode;

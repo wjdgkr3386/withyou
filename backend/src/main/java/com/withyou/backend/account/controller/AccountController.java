@@ -35,29 +35,24 @@ public class AccountController {
         return ResponseEntity.ok(ApiResponse.success("회원가입 성공", null));
     }
 
-    // 회원가입용 전화번호 인증번호 발송
     @PostMapping("/sms/send")
     public ResponseEntity<ApiResponse<Void>> sendSignupCode(@RequestBody SignupDTO request) {
         accountService.sendSignupCode(request.getPhone());
         return ResponseEntity.ok(ApiResponse.success("회원가입 인증번호 발송 성공", null));
     }
 
-    // 회원가입용 전화번호 인증번호 검증
     @PostMapping("/sms/verify")
     public ResponseEntity<ApiResponse<Void>> verifySignupCode(@RequestBody SignupDTO request) {
         accountService.verifySignupCode(request.getPhone(), request.getVerificationCode());
         return ResponseEntity.ok(ApiResponse.success("전화번호 인증 성공", null));
     }
 
-    // 회원가입용 이메일 인증번호 발송
     @PostMapping("/email/send")
     public ResponseEntity<ApiResponse<Void>> sendEmailCode(@RequestBody SignupDTO request) {
-        System.out.println("AccountController - sendEmailCode");
         accountService.sendEmailCode(request.getEmail());
         return ResponseEntity.ok(ApiResponse.success("이메일 인증번호 발송 성공", null));
     }
 
-    // 회원가입용 이메일 인증번호 검증
     @PostMapping("/email/verify")
     public ResponseEntity<ApiResponse<Void>> verifyEmailCode(@RequestBody SignupDTO request) {
         accountService.verifyEmailCode(request.getEmail(), request.getVerificationCode());
@@ -68,21 +63,27 @@ public class AccountController {
     // 계정 찾기 관련
     // =========================================================
 
-    // 아이디 찾기
     @PostMapping("/find/username")
     public ResponseEntity<ApiResponse<String>> findUsername(@RequestBody FindDTO request) {
         String username = accountService.findUsername(request);
         return ResponseEntity.ok(ApiResponse.success("아이디 찾기 성공", username));
     }
 
-    // 비밀번호 찾기용 인증번호 발송
-    @PostMapping("/send-verification") // 프론트 엔드포인트 유지
-    public ResponseEntity<ApiResponse<Void>> sendFindPwCode(@RequestBody FindDTO request) {
-        accountService.sendFindPwCode(request.getPhone());
+    // 비밀번호 찾기용 이메일 인증번호 발송
+    @PostMapping("/find/password/email/send")
+    public ResponseEntity<ApiResponse<Void>> sendFindPwEmailCode(@RequestBody FindDTO request) {
+        accountService.sendFindPwEmailCode(request.getEmail());
         return ResponseEntity.ok(ApiResponse.success("비밀번호 찾기 인증번호 발송 성공", null));
     }
 
-    // 비밀번호 찾기 (검증 및 임시 비밀번호 발급)
+    // 비밀번호 찾기용 이메일 인증번호 검증
+    @PostMapping("/find/password/email/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyFindPwEmailCode(@RequestBody FindDTO request) {
+        accountService.verifyFindPwEmailCode(request.getEmail(), request.getVerificationCode());
+        return ResponseEntity.ok(ApiResponse.success("이메일 인증 성공", null));
+    }
+
+    // 비밀번호 찾기 (임시 비밀번호 발급)
     @PostMapping("/find/password")
     public ResponseEntity<ApiResponse<Void>> findPassword(@RequestBody FindDTO request) {
         accountService.findPassword(request);
@@ -93,41 +94,33 @@ public class AccountController {
     // 인증/로그아웃/기타
     // =========================================================
 
-    // 로그인
     @PostMapping("/login")
     public ResponseEntity<ApiResponse<Void>> login(@RequestBody LoginDTO loginRequest, HttpServletResponse response) {
         String token = accountService.login(loginRequest);
         Cookie cookie = new Cookie("accessToken", token);
-
         cookie.setHttpOnly(true);
         cookie.setPath("/");
-        // 로그인 유지 (체크o : 30일 유지, 체크x : 브라우저 종료까지 유지)
-        cookie.setMaxAge(loginRequest.isRememberMe()?60 * 60 * 24 * 28:-1);
-
+        cookie.setMaxAge(loginRequest.isRememberMe() ? 60 * 60 * 24 * 28 : -1);
         response.addCookie(cookie);
         return ResponseEntity.ok(ApiResponse.success("로그인 성공", null));
     }
 
-    // 로그아웃
     @PostMapping("/logout")
     public ResponseEntity<?> logout(HttpServletResponse response, Authentication auth) {
         if (auth != null) {
             accountService.logout(auth.getName());
         }
-
         Cookie cookie = new Cookie("accessToken", null);
         cookie.setMaxAge(0);
         cookie.setPath("/");
         response.addCookie(cookie);
-
         return ResponseEntity.ok().build();
     }
 
-    // 네비바 로그인 확인
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<LoginResponse>> getMyInfo() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        
+
         if (authentication == null || authentication.getName().equals("anonymousUser")) {
             return ResponseEntity.status(401).body(ApiResponse.error("로그인 필요"));
         }
@@ -139,11 +132,11 @@ public class AccountController {
         String grade = user.getGrade() != null ? user.getGrade().name() : "";
 
         LoginResponse response = new LoginResponse(
-                user.getUsername(), 
-                role, 
-                user.getId(), 
-                user.getName(), 
-                grade, 
+                user.getUsername(),
+                role,
+                user.getId(),
+                user.getName(),
+                grade,
                 user.getGender() != null ? user.getGender() : "",
                 user.getEmail() != null ? user.getEmail() : "",
                 user.getCreatedAt()
@@ -157,18 +150,15 @@ public class AccountController {
     @DeleteMapping("/users/me")
     public ResponseEntity<ApiResponse<Void>> withdraw(HttpServletResponse response) {
         accountService.withdraw();
-
-        // 쿠키 삭제 (로그아웃 처리)
         Cookie cookie = new Cookie("accessToken", null);
         cookie.setMaxAge(0);
         cookie.setPath("/");
         response.addCookie(cookie);
-
         return ResponseEntity.ok(ApiResponse.success("회원탈퇴 완료", null));
     }
 
     // =========================================================
-    // 관리자용 학생 관리 (페이징 / 필터 / 정렬)
+    // 관리자용 학생 관리
     // =========================================================
     @GetMapping("/admin/users")
     public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getAllStudents(
@@ -180,20 +170,20 @@ public class AccountController {
             @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "DESC") String sortDir
     ) {
-        org.springframework.data.domain.Sort sort = sortDir.equalsIgnoreCase("ASC") 
-                ? org.springframework.data.domain.Sort.by(sortBy).ascending() 
+        org.springframework.data.domain.Sort sort = sortDir.equalsIgnoreCase("ASC")
+                ? org.springframework.data.domain.Sort.by(sortBy).ascending()
                 : org.springframework.data.domain.Sort.by(sortBy).descending();
-        
+
         org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size, sort);
 
-        org.springframework.data.domain.Page<com.withyou.backend.account.entity.User> studentsPage = 
+        org.springframework.data.domain.Page<com.withyou.backend.account.entity.User> studentsPage =
                 accountService.findStudentsPaged(name, grade, gender, pageable);
-        
+
         java.util.List<LoginResponse> studentsList = studentsPage.getContent().stream()
                 .map(user -> new LoginResponse(
-                        user.getUsername(), 
-                        user.getRole().name(), 
-                        user.getId(), 
+                        user.getUsername(),
+                        user.getRole().name(),
+                        user.getId(),
                         user.getName(),
                         user.getGrade() != null ? user.getGrade().name() : "",
                         user.getGender() != null ? user.getGender() : "",
@@ -201,14 +191,13 @@ public class AccountController {
                         user.getCreatedAt()
                 ))
                 .toList();
-        
+
         java.util.Map<String, Object> response = new java.util.HashMap<>();
         response.put("list", studentsList);
         response.put("totalElements", studentsPage.getTotalElements());
         response.put("totalPages", studentsPage.getTotalPages());
         response.put("currentPage", studentsPage.getNumber());
-                
+
         return ResponseEntity.ok(ApiResponse.success("학생 목록 조회 성공", response));
     }
-
 }

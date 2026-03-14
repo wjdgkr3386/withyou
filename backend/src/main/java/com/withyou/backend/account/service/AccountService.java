@@ -32,12 +32,11 @@ public class AccountService {
     private final RedisTemplate<String, String> redisTemplate;
     private final Util util;
 
-    // Redis 키 접두사 상수화
     private static final String SIGNUP_PHONE_PREFIX = "auth:signup:phone:";
     private static final String VERIFIED_PHONE_PREFIX = "verified:signup:phone:";
     private static final String SIGNUP_EMAIL_PREFIX = "auth:signup:email:";
     private static final String VERIFIED_EMAIL_PREFIX = "verified:signup:email:";
-    private static final String FIND_PW_PREFIX = "auth:findPw:";
+    private static final String FIND_PW_EMAIL_PREFIX = "auth:findPw:email:";
 
     public AccountService(UserRepository userRepository,
                           PasswordEncoder passwordEncoder,
@@ -72,11 +71,10 @@ public class AccountService {
 
         String token = jwtTokenProvider.createToken(user.getUsername(), user.getRole().name());
 
-        // 로그인 유지 체크에 따라 28일 및 1일
         redisTemplate.opsForValue().set(
                 "RT:" + user.getUsername(),
                 token,
-                loginDTO.isRememberMe()? 28 : 1 , TimeUnit.DAYS
+                loginDTO.isRememberMe() ? 28 : 1, TimeUnit.DAYS
         );
 
         return token;
@@ -125,7 +123,7 @@ public class AccountService {
         );
         try {
             userRepository.save(user);
-        }catch(Exception e){
+        } catch (Exception e) {
             System.out.println(e);
             throw new CustomException("회원가입 처리 중 오류가 발생했습니다.");
         }
@@ -196,7 +194,7 @@ public class AccountService {
     }
 
     // ===================
-    // 아이디 찾기 (인증 없이 조회만)
+    // 아이디 찾기
     // ===================
     public String findUsername(FindDTO findDTO) {
         User user = userRepository.findByNameAndPhone(findDTO.getName(), findDTO.getPhone())
@@ -205,39 +203,62 @@ public class AccountService {
     }
 
     // ===================
-    // 비밀번호 찾기용 인증번호 발송
+    // 비밀번호 찾기용 이메일 인증번호 발송
     // ===================
-    public void sendFindPwCode(String phone) {
-        String code = util.randomDigitCode(6);
-        // 비밀번호 찾기 전용 키 사용
-        redisTemplate.opsForValue().set(FIND_PW_PREFIX + phone, code, 5, TimeUnit.MINUTES);
+    public void sendFindPwEmailCode(String email) {
+        // ✅ DB에 존재하는 이메일인지 확인
+        if (!userRepository.existsByEmail(email)) {
+            throw new CustomException("등록되지 않은 이메일입니다.");
+        }
 
-        boolean result = solapiService.sendVerificationSms(phone, "[위드유] 비밀번호 찾기 인증번호: [" + code + "]");
-        if (!result) throw new CustomException("인증번호 발송 실패");
+        String code = util.randomDigitCode(6);
+        redisTemplate.opsForValue().set(FIND_PW_EMAIL_PREFIX + email, code, 5, TimeUnit.MINUTES);
+
+        try {
+            org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            message.setTo(email);
+            message.setSubject("[위드유] 비밀번호 찾기 인증번호");
+            message.setText("안녕하세요. 위드유입니다.\n\n비밀번호 찾기 인증번호는 [" + code + "] 입니다.\n5분 이내에 입력해 주세요.");
+            mailSender.send(message);
+        } catch (Exception e) {
+            throw new CustomException("이메일 발송에 실패했습니다.");
+        }
     }
 
     // ===================
-    // 비밀번호 재설정 (검증 포함)
+    // 비밀번호 찾기용 이메일 인증번호 검증
     // ===================
-    public void findPassword(FindDTO request) {
-        User user = userRepository.findByNameAndUsernameAndPhone(
-                request.getName(), request.getUsername(), request.getPhone()
-        ).orElseThrow(() -> new CustomException("일치하는 회원 정보를 찾을 수 없습니다."));
-
-        String key = FIND_PW_PREFIX + request.getPhone();
+    public void verifyFindPwEmailCode(String email, String code) {
+        String key = FIND_PW_EMAIL_PREFIX + email;
         String savedCode = redisTemplate.opsForValue().get(key);
 
         if (savedCode == null) throw new CustomException("인증번호가 만료되었습니다.");
-        if (!savedCode.equals(request.getVerificationCode())) throw new CustomException("인증번호가 일치하지 않습니다.");
+        if (!savedCode.equals(code)) throw new CustomException("인증번호가 일치하지 않습니다.");
 
         redisTemplate.delete(key);
+    }
 
-        String tempPassword = util.randomDigitCode(10); // 임시 비밀번호 무작위 생성 추천
-        boolean result = solapiService.sendVerificationSms(request.getPhone(), "[위드유] 임시 비밀번호: " + tempPassword);
+    // ===================
+    // 비밀번호 재설정 (임시 비밀번호 이메일 발송)
+    // ===================
+    public void findPassword(FindDTO request) {
+        User user = userRepository.findByNameAndUsernameAndEmail(
+                request.getName(), request.getUsername(), request.getEmail()
+        ).orElseThrow(() -> new CustomException("일치하는 회원 정보를 찾을 수 없습니다."));
 
-        if (!result) throw new CustomException("메시지 발송 실패");
-
+        String tempPassword = util.randomDigitCode(10);
         user.setPassword(passwordEncoder.encode(tempPassword));
+
+        try {
+            org.springframework.mail.SimpleMailMessage message = new org.springframework.mail.SimpleMailMessage();
+            message.setTo(request.getEmail());
+            message.setSubject("[위드유] 임시 비밀번호 안내");
+            message.setText("안녕하세요. 위드유입니다.\n\n임시 비밀번호는 [" + tempPassword + "] 입니다.\n로그인 후 반드시 비밀번호를 변경해 주세요.");
+            mailSender.send(message);
+        } catch (Exception e) {
+            System.out.println("이메일 발송 오류: " + e.getMessage());
+            throw new CustomException("임시 비밀번호 이메일 발송에 실패했습니다.");
+        }
     }
 
     // ===================
@@ -255,10 +276,9 @@ public class AccountService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다."));
 
-        // 소프트 삭제
         user.withdraw(
-            user.getPhone() + "_WITHDRAW_" + user.getId(),
-            user.getEmail() + "_WITHDRAW_" + user.getId()
+                user.getPhone() + "_WITHDRAW_" + user.getId(),
+                user.getEmail() + "_WITHDRAW_" + user.getId()
         );
     }
 
@@ -269,12 +289,10 @@ public class AccountService {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new CustomException("사용자를 찾을 수 없습니다."));
 
-        // 현재 비밀번호 체크
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
             throw new CustomException("현재 비밀번호가 일치하지 않습니다.");
         }
 
-        // 새 비밀번호 암호화 및 저장
         String encodedPassword = passwordEncoder.encode(request.getNewPassword());
         user.setPassword(encodedPassword);
         userRepository.save(user);
@@ -286,8 +304,8 @@ public class AccountService {
     public void logout(String username) {
         try {
             redisTemplate.delete("RT:" + username);
-        }catch(Exception e){
-            throw new CustomException("로그아웃 도중 오류가 발생했습니다. : "+e.getMessage());
+        } catch (Exception e) {
+            throw new CustomException("로그아웃 도중 오류가 발생했습니다. : " + e.getMessage());
         }
     }
 
@@ -297,18 +315,17 @@ public class AccountService {
     }
 
     // ===================
-    // 학생 목록 조회 (관리자용 - 페이징 및 필터)
+    // 학생 목록 조회 (관리자용)
     // ===================
     public org.springframework.data.domain.Page<User> findStudentsPaged(
-            String name, 
-            com.withyou.backend.account.entity.Grade grade, 
+            String name,
+            com.withyou.backend.account.entity.Grade grade,
             String gender,
             org.springframework.data.domain.Pageable pageable) {
-        
-        // 검색 필터 전처리
+
         String searchName = (name != null && !name.trim().isEmpty()) ? name.trim() : null;
         String searchGender = (gender != null && !gender.trim().isEmpty()) ? gender : null;
-        
+
         return userRepository.findStudentsPaged(Role.USER, searchName, grade, searchGender, pageable);
     }
 }

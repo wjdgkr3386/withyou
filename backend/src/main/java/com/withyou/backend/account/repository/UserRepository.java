@@ -15,11 +15,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
 
     boolean existsByEmail(String email);
 
-    // 이름과 휴대폰 번호로 계정 찾기
+    // 이름과 휴대폰 번호로 아이디 찾기
     Optional<User> findByNameAndPhone(String name, String phone);
 
-    // 이름, 아이디, 휴대폰 번호로 계정 찾기
-    Optional<User> findByNameAndUsernameAndPhone(String name, String username, String phone);
+    // 이름, 아이디, 이메일로 계정 찾기 (비밀번호 찾기용)
+    Optional<User> findByNameAndUsernameAndEmail(String name, String username, String email);
 
     // 역할별 사용자 조회 (관리자용 학생 관리)
     java.util.List<User> findByRole(com.withyou.backend.account.entity.Role role);
